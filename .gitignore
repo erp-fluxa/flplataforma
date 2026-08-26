@@ -1,0 +1,36 @@
+# Dependências e Builds
+node_modules/
+dist/
+.vite/
+
+# Variáveis de ambiente e segredos
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Banco de dados local e backups
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+backups/
+data.db
+backup.sql
+
+# Logs e arquivos temporários de IA/IDE
+*.log
+.gemini/
+.system_generated/
+.tempmediaStorage/
+.user_uploaded/
+scratch/
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Vercel
+.vercel/

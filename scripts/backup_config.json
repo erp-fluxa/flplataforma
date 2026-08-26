@@ -1,0 +1,10 @@
+{
+  "nomeEmpresa": "JP3D INDUSTRIA E COMERCIO LTDA",
+  "backupLocalDir": "C:\\ERP Gestao\\backups\\daily",
+  "backupOffsiteDir": "C:\\ERP Gestao\\backups_offsite",
+  "autoDetectCloudSync": true,
+  "retencaoDias": 30,
+  "horarioExecucao": "23:00",
+  "compactar": true,
+  "gerarChecksumSHA256": true
+}

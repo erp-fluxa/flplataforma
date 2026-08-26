@@ -1,0 +1,16 @@
+{
+  "name": "Gescomp ERP Industrial",
+  "short_name": "Gescomp ERP",
+  "description": "Sistema Único Integrado de Gestão ERP, Compras, PCP & Estoque",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "assets/logo_gescomp_monograma_transparente.png",
+      "sizes": "400x400",
+      "type": "image/png"
+    }
+  ]
+}
