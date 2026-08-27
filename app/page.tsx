@@ -57,7 +57,25 @@ export default async function DashboardPage() {
         </div>
 
         {/* Módulos do Sistema Migrados */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Link
+            href="/compras"
+            className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-700/60 rounded-2xl p-6 space-y-3 transition-all shadow-lg hover:shadow-emerald-950/20"
+          >
+            <div className="w-10 h-10 rounded-xl bg-emerald-950 border border-emerald-800/50 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+              🛒
+            </div>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-white group-hover:text-emerald-300 transition-colors">
+                Compras & Cotações RFQ
+              </h3>
+              <span className="text-xs text-emerald-400 font-bold">Acessar →</span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Fornecedores homologados, requisições internas, mapa de cotação e pedidos de compra.
+            </p>
+          </Link>
+
           <Link
             href="/producao"
             className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-amber-700/60 rounded-2xl p-6 space-y-3 transition-all shadow-lg hover:shadow-amber-950/20"

@@ -1,9 +1,10 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/producao/page": "app/producao/page.js",
-  "/configuracoes/page": "app/configuracoes/page.js",
-  "/estoque/page": "app/estoque/page.js",
+  "/compras/page": "app/compras/page.js",
   "/page": "app/page.js",
+  "/estoque/page": "app/estoque/page.js",
+  "/configuracoes/page": "app/configuracoes/page.js",
   "/produtos/page": "app/produtos/page.js",
+  "/producao/page": "app/producao/page.js",
   "/login/page": "app/login/page.js"
 }

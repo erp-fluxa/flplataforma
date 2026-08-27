@@ -194,6 +194,72 @@ export interface Database {
           criado_em: string
         }
       }
+      suppliers: {
+        Row: {
+          id: string
+          company_id: string
+          nome: string
+          cnpj: string | null
+          contato_nome: string | null
+          email: string | null
+          telefone: string | null
+          cidade: string | null
+          uf: string | null
+          categorias: string[] | null
+          ativo: boolean
+          observacoes: string | null
+          criado_em: string
+        }
+      }
+      requisitions: {
+        Row: {
+          id: string
+          company_id: string
+          numero: string
+          solicitante: string
+          setor: string
+          prioridade: 'baixa' | 'normal' | 'alta' | 'urgente'
+          status: 'rascunho' | 'pendente' | 'aprovada' | 'em_cotacao' | 'rejeitada'
+          justificativa: string | null
+          data_necessidade: string | null
+          criado_em: string
+        }
+      }
+      quotations: {
+        Row: {
+          id: string
+          company_id: string
+          numero: string
+          titulo: string
+          solicitante: string | null
+          comprador: string
+          fornecedor_id: string | null
+          status: 'nova_solicitacao' | 'em_cotacao' | 'em_analise' | 'aprovada' | 'cancelada'
+          prioridade: 'baixa' | 'normal' | 'alta' | 'urgente'
+          prazo: string | null
+          valor_estimado: number
+          valor_final: number
+          observacoes: string | null
+          criado_em: string
+        }
+      }
+      orders: {
+        Row: {
+          id: string
+          company_id: string
+          numero: string
+          quotation_id: string | null
+          supplier_id: string
+          condicao_pagamento: string | null
+          prazo_entrega: string | null
+          frete: number
+          desconto: number
+          valor_total: number
+          status: 'emitido' | 'parcial' | 'concluido' | 'cancelado'
+          observacoes: string | null
+          criado_em: string
+        }
+      }
       companies: {
         Row: {
           id: string
