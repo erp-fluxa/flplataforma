@@ -23,32 +23,6 @@ export interface Database {
           atualizado_em: string
           atualizado_por: string | null
         }
-        Insert: {
-          id?: string
-          nome_sistema?: string
-          subtitulo?: string
-          logo_institucional_url?: string | null
-          logo_plataforma_url?: string | null
-          logo_sidebar_url?: string | null
-          cor_primaria?: string
-          tema_padrao?: string
-          favicon_url?: string | null
-          atualizado_em?: string
-          atualizado_por?: string | null
-        }
-        Update: {
-          id?: string
-          nome_sistema?: string
-          subtitulo?: string
-          logo_institucional_url?: string | null
-          logo_plataforma_url?: string | null
-          logo_sidebar_url?: string | null
-          cor_primaria?: string
-          tema_padrao?: string
-          favicon_url?: string | null
-          atualizado_em?: string
-          atualizado_por?: string | null
-        }
       }
       material_categories: {
         Row: {
@@ -136,18 +110,88 @@ export interface Database {
           criado_em: string
         }
       }
-      stock_alerts: {
+      bom_versions: {
         Row: {
           id: string
           product_id: string
-          nivel: 'critico' | 'atencao' | 'ok'
-          disponivel_no_disparo: number
-          estoque_minimo_no_disparo: number
-          status: 'aberto' | 'resolvido' | 'silenciado'
-          reconhecido_por: string | null
-          reconhecido_em: string | null
+          versao: string
+          descricao: string
+          status: 'rascunho' | 'ativa' | 'obsoleta'
+          vigente_de: string | null
+          vigente_ate: string | null
+          criado_em: string
+        }
+      }
+      bom_items: {
+        Row: {
+          id: string
+          bom_version_id: string
+          component_product_id: string
+          quantidade: number
+          perda_percentual: number
+          opcional: boolean
+          observacao: string | null
+          criado_em: string
+        }
+      }
+      work_centers: {
+        Row: {
+          id: string
+          nome: string
+          tipo: 'bancada' | 'celula' | 'maquina' | 'linha'
+          capacidade_hora_dia: number
+          custo_hora: number
+          ativo: boolean
+          criado_em: string
+        }
+      }
+      routing_operations: {
+        Row: {
+          id: string
+          bom_version_id: string
+          sequencia: number
+          nome: string
+          work_center_id: string | null
+          tempo_setup_min: number
+          tempo_unitario_min: number
+          instrucoes: string | null
+          criado_em: string
+        }
+      }
+      production_orders: {
+        Row: {
+          id: string
+          company_id: string
+          numero: string
+          product_id: string
+          bom_version_id: string | null
+          quantidade: number
+          quantidade_produzida: number
+          quantidade_refugo: number
+          prioridade: 'baixa' | 'normal' | 'alta' | 'urgente'
+          status: 'planejada' | 'separacao' | 'producao' | 'qualidade' | 'concluida' | 'cancelada'
+          data_prevista_inicio: string | null
+          data_prevista_fim: string | null
+          data_inicio_real: string | null
+          data_fim_real: string | null
+          responsavel_nome: string | null
+          observacoes: string | null
+          posicao_kanban: number
           criado_em: string
           atualizado_em: string
+        }
+      }
+      production_order_materials: {
+        Row: {
+          id: string
+          production_order_id: string
+          component_product_id: string
+          quantidade_necessaria: number
+          quantidade_reservada: number
+          quantidade_separada: number
+          quantidade_consumida: number
+          status: 'pendente' | 'separado' | 'consumido'
+          criado_em: string
         }
       }
       companies: {

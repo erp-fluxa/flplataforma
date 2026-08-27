@@ -57,7 +57,25 @@ export default async function DashboardPage() {
         </div>
 
         {/* Módulos do Sistema Migrados */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Link
+            href="/producao"
+            className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-amber-700/60 rounded-2xl p-6 space-y-3 transition-all shadow-lg hover:shadow-amber-950/20"
+          >
+            <div className="w-10 h-10 rounded-xl bg-amber-950 border border-amber-800/50 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+              ⚙️
+            </div>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-white group-hover:text-amber-300 transition-colors">
+                PCP & Kanban
+              </h3>
+              <span className="text-xs text-amber-400 font-bold">Acessar →</span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Ordens de Produção, Kanban industrial em 5 etapas e Fichas Técnicas (BOM).
+            </p>
+          </Link>
+
           <Link
             href="/estoque"
             className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-teal-700/60 rounded-2xl p-6 space-y-3 transition-all shadow-lg hover:shadow-teal-950/20"
@@ -67,12 +85,12 @@ export default async function DashboardPage() {
             </div>
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-white group-hover:text-teal-300 transition-colors">
-                Estoque & Almoxarifado
+                Estoque & Depósitos
               </h3>
               <span className="text-xs text-teal-400 font-bold">Acessar →</span>
             </div>
             <p className="text-xs text-slate-400">
-              Controle multi-depósito (Matriz SC e Filial PR), saldos em tempo real e extrato KARDEX.
+              Controle multi-depósito (Matriz SC e Filial PR), saldos em tempo real e KARDEX.
             </p>
           </Link>
 
@@ -85,12 +103,12 @@ export default async function DashboardPage() {
             </div>
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-white group-hover:text-cyan-300 transition-colors">
-                Produtos & Matérias-Primas
+                Catálogo de Produtos
               </h3>
               <span className="text-xs text-cyan-400 font-bold">Acessar →</span>
             </div>
             <p className="text-xs text-slate-400">
-              Catálogo mestre normalizado (MP, MUC e Produtos Acabados) com controle de estoque mínimo.
+              Matérias-Primas (MP), insumos de consumo (MUC) e produtos acabados.
             </p>
           </Link>
 
@@ -103,12 +121,12 @@ export default async function DashboardPage() {
             </div>
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-white group-hover:text-indigo-300 transition-colors">
-                Branding & Logotipos
+                Branding & Logos
               </h3>
               <span className="text-xs text-indigo-400 font-bold">Acessar →</span>
             </div>
             <p className="text-xs text-slate-400">
-              Gerenciamento de logotipos oficiais com propagação imediata para todos os dispositivos.
+              Gerenciamento de logotipos oficiais com propagação imediata em nuvem.
             </p>
           </Link>
         </div>
