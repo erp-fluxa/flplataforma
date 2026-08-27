@@ -56,31 +56,61 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* Módulos do Sistema */}
+        {/* Módulos do Sistema Migrados */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-teal-950 border border-teal-800/50 flex items-center justify-center text-xl">
+          <Link
+            href="/estoque"
+            className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-teal-700/60 rounded-2xl p-6 space-y-3 transition-all shadow-lg hover:shadow-teal-950/20"
+          >
+            <div className="w-10 h-10 rounded-xl bg-teal-950 border border-teal-800/50 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
               📦
             </div>
-            <h3 className="font-bold text-white">Estoque & Almoxarifado</h3>
-            <p className="text-xs text-slate-400">Controle multi-depósito (Matriz SC e Filial PR), saldos e movimentações.</p>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-cyan-950 border border-cyan-800/50 flex items-center justify-center text-xl">
-              ⚙️
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-white group-hover:text-teal-300 transition-colors">
+                Estoque & Almoxarifado
+              </h3>
+              <span className="text-xs text-teal-400 font-bold">Acessar →</span>
             </div>
-            <h3 className="font-bold text-white">PCP & Ordens de Produção</h3>
-            <p className="text-xs text-slate-400">Kanban industrial, separação de materiais (picking) e fichas técnicas BOM.</p>
-          </div>
+            <p className="text-xs text-slate-400">
+              Controle multi-depósito (Matriz SC e Filial PR), saldos em tempo real e extrato KARDEX.
+            </p>
+          </Link>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-950 border border-indigo-800/50 flex items-center justify-center text-xl">
-              🛒
+          <Link
+            href="/produtos"
+            className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-cyan-700/60 rounded-2xl p-6 space-y-3 transition-all shadow-lg hover:shadow-cyan-950/20"
+          >
+            <div className="w-10 h-10 rounded-xl bg-cyan-950 border border-cyan-800/50 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+              🏷️
             </div>
-            <h3 className="font-bold text-white">Compras & Cotações RFQ</h3>
-            <p className="text-xs text-slate-400">Mapa de fornecedores, equalização financeira e emissão de pedidos.</p>
-          </div>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-white group-hover:text-cyan-300 transition-colors">
+                Produtos & Matérias-Primas
+              </h3>
+              <span className="text-xs text-cyan-400 font-bold">Acessar →</span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Catálogo mestre normalizado (MP, MUC e Produtos Acabados) com controle de estoque mínimo.
+            </p>
+          </Link>
+
+          <Link
+            href="/configuracoes"
+            className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-700/60 rounded-2xl p-6 space-y-3 transition-all shadow-lg hover:shadow-indigo-950/20"
+          >
+            <div className="w-10 h-10 rounded-xl bg-indigo-950 border border-indigo-800/50 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+              🎨
+            </div>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-white group-hover:text-indigo-300 transition-colors">
+                Branding & Logotipos
+              </h3>
+              <span className="text-xs text-indigo-400 font-bold">Acessar →</span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Gerenciamento de logotipos oficiais com propagação imediata para todos os dispositivos.
+            </p>
+          </Link>
         </div>
       </main>
     </div>
