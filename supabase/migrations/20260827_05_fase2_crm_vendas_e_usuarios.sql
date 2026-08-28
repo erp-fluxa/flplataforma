@@ -1,12 +1,16 @@
 -- ==============================================================================
 -- FASE 2.4: CRM, CLIENTES, FUNIL DE VENDAS, PEDIDOS DE VENDA & USUÁRIOS (RBAC)
--- Migration 05: 20260827_05_fase2_crm_vendas_e_usuarios.sql (Corrigida)
+-- Migration 05: 20260827_05_fase2_crm_vendas_e_usuarios.sql (100% Compatível com UUID/TEXT)
 -- ==============================================================================
 
--- 1. CLIENTES & CONTATOS COMERCIAIS
+-- 1. HABILITAR EXTENSÕES DE UUID CASO NÃO ESTEJAM
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- 2. CLIENTES & CONTATOS COMERCIAIS
 CREATE TABLE IF NOT EXISTS public.customers (
-    id TEXT PRIMARY KEY DEFAULT ('cli-' || substr(gen_random_uuid()::text, 1, 8)),
-    company_id TEXT REFERENCES public.companies(id) ON DELETE CASCADE DEFAULT 'comp-1',
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID,
     nome TEXT NOT NULL,
     razao_social TEXT,
     cnpj_cpf TEXT,
@@ -17,28 +21,37 @@ CREATE TABLE IF NOT EXISTS public.customers (
     cidade TEXT,
     uf TEXT,
     cep TEXT,
-    origem TEXT DEFAULT 'indicacao', -- 'indicacao' | 'google' | 'instagram' | 'feira' | 'prospeccao'
-    status TEXT NOT NULL DEFAULT 'cliente', -- 'lead' | 'prospect' | 'cliente' | 'inativo'
+    origem TEXT DEFAULT 'indicacao',
+    status TEXT NOT NULL DEFAULT 'cliente',
     observacoes TEXT,
     criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Seed de Clientes de Exemplo
-INSERT INTO public.customers (id, nome, razao_social, cnpj_cpf, email, telefone, cidade, uf, status) VALUES
-    ('cli-1', 'Visual Art Comunicação Visual', 'Visual Art Placas & Luminosos Ltda', '11.222.333/0001-44', 'contato@visualart.com.br', '(47) 3322-5500', 'Blumenau', 'SC', 'cliente'),
-    ('cli-2', 'Cenografia Criativa Brasil', 'Cenografia Criativa Produções Artísticas ME', '22.333.444/0001-55', 'cenografia@criativabrasil.com.br', '(11) 97777-3333', 'São Paulo', 'SP', 'cliente')
-ON CONFLICT (id) DO NOTHING;
+-- Garantir colunas novas caso a tabela já existisse no Supabase
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS cnpj_cpf TEXT;
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS origem TEXT DEFAULT 'indicacao';
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'cliente';
+ALTER TABLE public.customers ADD COLUMN IF NOT EXISTS observacoes TEXT;
 
--- 2. FUNIL COMERCIAL / OPORTUNIDADES (CRM DEALS & LEADS)
+-- Seed de Clientes com UUID compatível
+INSERT INTO public.customers (nome, razao_social, cnpj_cpf, email, telefone, cidade, uf, status)
+SELECT 'Visual Art Comunicação Visual', 'Visual Art Placas & Luminosos Ltda', '11.222.333/0001-44', 'contato@visualart.com.br', '(47) 3322-5500', 'Blumenau', 'SC', 'cliente'
+WHERE NOT EXISTS (SELECT 1 FROM public.customers WHERE nome = 'Visual Art Comunicação Visual');
+
+INSERT INTO public.customers (nome, razao_social, cnpj_cpf, email, telefone, cidade, uf, status)
+SELECT 'Cenografia Criativa Brasil', 'Cenografia Criativa Produções Artísticas ME', '22.333.444/0001-55', 'cenografia@criativabrasil.com.br', '(11) 97777-3333', 'São Paulo', 'SP', 'cliente'
+WHERE NOT EXISTS (SELECT 1 FROM public.customers WHERE nome = 'Cenografia Criativa Brasil');
+
+-- 3. FUNIL COMERCIAL / OPORTUNIDADES (CRM DEALS & LEADS)
 CREATE TABLE IF NOT EXISTS public.deals (
-    id TEXT PRIMARY KEY DEFAULT ('deal-' || substr(gen_random_uuid()::text, 1, 8)),
-    company_id TEXT REFERENCES public.companies(id) ON DELETE CASCADE DEFAULT 'comp-1',
-    customer_id TEXT REFERENCES public.customers(id) ON DELETE SET NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID,
+    customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
     titulo TEXT NOT NULL,
     etapa TEXT NOT NULL DEFAULT 'prospeccao', -- 'prospeccao' | 'qualificacao' | 'proposta' | 'negociacao' | 'ganho' | 'perdido'
-    valor_estimado INTEGER DEFAULT 0,         -- Centavos BRL (ex: 4200000 = R$ 42.000,00)
-    probabilidade INTEGER DEFAULT 50,         -- 0 a 100%
-    linha_interesse TEXT DEFAULT 'CV',        -- 'CV' | 'CX' | 'insumos' | 'servicos'
+    valor_estimado INTEGER DEFAULT 0,         -- Centavos BRL
+    probabilidade INTEGER DEFAULT 50,
+    linha_interesse TEXT DEFAULT 'CV',
     responsavel_nome TEXT DEFAULT 'João Marcos',
     data_fechamento_prevista DATE,
     motivo_perda TEXT,
@@ -46,18 +59,18 @@ CREATE TABLE IF NOT EXISTS public.deals (
     atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 3. PEDIDOS DE VENDA INDUSTRIAIS
+-- 4. PEDIDOS DE VENDA INDUSTRIAIS
 CREATE TABLE IF NOT EXISTS public.sales_orders (
-    id TEXT PRIMARY KEY DEFAULT ('pv-' || substr(gen_random_uuid()::text, 1, 8)),
-    company_id TEXT REFERENCES public.companies(id) ON DELETE CASCADE DEFAULT 'comp-1',
-    numero TEXT NOT NULL UNIQUE,
-    customer_id TEXT NOT NULL REFERENCES public.customers(id) ON DELETE RESTRICT,
-    deal_id TEXT REFERENCES public.deals(id) ON DELETE SET NULL,
-    valor_total INTEGER NOT NULL DEFAULT 0,    -- Centavos BRL
-    sinal_entrada INTEGER DEFAULT 0,          -- Centavos BRL
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID,
+    numero TEXT NOT NULL,
+    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    deal_id UUID REFERENCES public.deals(id) ON DELETE SET NULL,
+    valor_total INTEGER NOT NULL DEFAULT 0,
+    sinal_entrada INTEGER DEFAULT 0,
     numero_parcelas INTEGER DEFAULT 1,
     prazo_fabricacao_dias INTEGER DEFAULT 60,
-    status TEXT NOT NULL DEFAULT 'orcamento', -- 'orcamento' | 'aprovado' | 'em_producao' | 'faturado' | 'entregue' | 'cancelado'
+    status TEXT NOT NULL DEFAULT 'orcamento',
     vendedor_nome TEXT DEFAULT 'João Marcos',
     condicoes_pagamento TEXT DEFAULT 'Entrada 30% + saldo no faturamento',
     observacoes TEXT,
@@ -65,16 +78,16 @@ CREATE TABLE IF NOT EXISTS public.sales_orders (
 );
 
 CREATE TABLE IF NOT EXISTS public.sales_order_items (
-    id TEXT PRIMARY KEY DEFAULT ('pvit-' || substr(gen_random_uuid()::text, 1, 8)),
-    sales_order_id TEXT NOT NULL REFERENCES public.sales_orders(id) ON DELETE CASCADE,
-    product_id TEXT REFERENCES public.products(id) ON DELETE SET NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sales_order_id UUID NOT NULL REFERENCES public.sales_orders(id) ON DELETE CASCADE,
+    product_id UUID,
     descricao TEXT NOT NULL,
     quantidade NUMERIC NOT NULL DEFAULT 1,
     preco_unitario INTEGER NOT NULL,
     desconto INTEGER DEFAULT 0
 );
 
--- 4. PAPÉIS E PERMISSÕES (RBAC)
+-- 5. PAPÉIS E PERMISSÕES (RBAC)
 CREATE TABLE IF NOT EXISTS public.roles (
     id TEXT PRIMARY KEY,
     nome TEXT NOT NULL,
@@ -90,14 +103,14 @@ INSERT INTO public.roles (id, nome, descricao, permissoes) VALUES
     ('comercial', 'Comercial & Vendas', 'CRM, funil de oportunidades e pedidos de venda', '["vendas", "crm", "produtos_leitura"]'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 
--- 5. HABILITAÇÃO DO ROW LEVEL SECURITY
+-- 6. HABILITAÇÃO DO ROW LEVEL SECURITY
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.deals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
 
--- 6. POLÍTICAS RLS PERMISSIVAS
+-- 7. POLÍTICAS RLS PERMISSIVAS
 DROP POLICY IF EXISTS "customers_all" ON public.customers;
 CREATE POLICY "customers_all" ON public.customers FOR ALL USING (true) WITH CHECK (true);
 
