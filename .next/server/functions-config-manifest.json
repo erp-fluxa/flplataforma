@@ -1,1 +1,1 @@
-{"version":1,"functions":{"/":{},"/configuracoes":{},"/usuarios":{},"/login":{},"/compras":{},"/vendas":{},"/producao":{},"/produtos":{},"/estoque":{}}}
+{"version":1,"functions":{"/configuracoes":{},"/compras":{},"/login":{},"/producao":{},"/estoque":{},"/":{},"/usuarios":{},"/vendas":{},"/produtos":{}}}
