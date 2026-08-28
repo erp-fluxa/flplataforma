@@ -59,6 +59,24 @@ export default async function DashboardPage() {
         {/* Módulos do Sistema Migrados */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Link
+            href="/vendas"
+            className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-pink-700/60 rounded-2xl p-6 space-y-3 transition-all shadow-lg hover:shadow-pink-950/20"
+          >
+            <div className="w-10 h-10 rounded-xl bg-pink-950 border border-pink-800/50 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+              🎯
+            </div>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-white group-hover:text-pink-300 transition-colors">
+                CRM & Vendas
+              </h3>
+              <span className="text-xs text-pink-400 font-bold">Acessar →</span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Funil comercial de leads em 5 etapas, clientes e pedidos de venda industriais (PV).
+            </p>
+          </Link>
+
+          <Link
             href="/compras"
             className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-700/60 rounded-2xl p-6 space-y-3 transition-all shadow-lg hover:shadow-emerald-950/20"
           >
@@ -131,20 +149,20 @@ export default async function DashboardPage() {
           </Link>
 
           <Link
-            href="/configuracoes"
+            href="/usuarios"
             className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-indigo-700/60 rounded-2xl p-6 space-y-3 transition-all shadow-lg hover:shadow-indigo-950/20"
           >
             <div className="w-10 h-10 rounded-xl bg-indigo-950 border border-indigo-800/50 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
-              🎨
+              👥
             </div>
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-white group-hover:text-indigo-300 transition-colors">
-                Branding & Logos
+                Usuários & Governança
               </h3>
               <span className="text-xs text-indigo-400 font-bold">Acessar →</span>
             </div>
             <p className="text-xs text-slate-400">
-              Gerenciamento de logotipos oficiais com propagação imediata em nuvem.
+              Gestão de colaboradores, credenciais e matriz de permissões de acesso RBAC.
             </p>
           </Link>
         </div>

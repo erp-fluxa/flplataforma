@@ -260,6 +260,69 @@ export interface Database {
           criado_em: string
         }
       }
+      customers: {
+        Row: {
+          id: string
+          company_id: string
+          nome: string
+          razao_social: string | null
+          cnpj_cpf: string | null
+          ie: string | null
+          email: string | null
+          telefone: string | null
+          endereco: string | null
+          cidade: string | null
+          uf: string | null
+          cep: string | null
+          origem: string | null
+          status: 'lead' | 'prospect' | 'cliente' | 'inativo'
+          observacoes: string | null
+          criado_em: string
+        }
+      }
+      deals: {
+        Row: {
+          id: string
+          company_id: string
+          customer_id: string | null
+          titulo: string
+          etapa: 'prospeccao' | 'qualificacao' | 'proposta' | 'negociacao' | 'ganho' | 'perdido'
+          valor_estimado: number
+          probabilidade: number
+          linha_interesse: string | null
+          responsavel_nome: string | null
+          data_fechamento_prevista: string | null
+          motivo_perda: string | null
+          criado_em: string
+          atualizado_em: string
+        }
+      }
+      sales_orders: {
+        Row: {
+          id: string
+          company_id: string
+          numero: string
+          customer_id: string
+          deal_id: string | null
+          valor_total: number
+          sinal_entrada: number
+          numero_parcelas: number
+          prazo_fabricacao_dias: number
+          status: 'orcamento' | 'aprovado' | 'em_producao' | 'faturado' | 'entregue' | 'cancelado'
+          vendedor_nome: string | null
+          condicoes_pagamento: string | null
+          observacoes: string | null
+          criado_em: string
+        }
+      }
+      roles: {
+        Row: {
+          id: string
+          nome: string
+          descricao: string | null
+          permissoes: string[]
+        }
+      }
       companies: {
         Row: {
           id: string
