@@ -229,9 +229,32 @@ DROP POLICY IF EXISTS "prod_orders_policy_all" ON public.production_orders;
 CREATE POLICY "prod_orders_policy_all" ON public.production_orders
     FOR ALL USING (true) WITH CHECK (true);
 
+-- 2.10 Configurações Globais de Marca / Branding (Singleton)
+CREATE TABLE IF NOT EXISTS public.system_branding (
+    id UUID PRIMARY KEY DEFAULT '00000000-0000-0000-0000-000000000001'::uuid,
+    logo_icone_url TEXT,
+    logo_texto_url TEXT,
+    logo_login_url TEXT,
+    logo_institucional_url TEXT,
+    nome_sistema TEXT DEFAULT 'Fluxa ERP',
+    slogan TEXT DEFAULT 'Gestão Integrada Industrial',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Inserir registro inicial da marca se não existir
+INSERT INTO public.system_branding (id, nome_sistema, slogan)
+VALUES ('00000000-0000-0000-0000-000000000001'::uuid, 'Fluxa ERP', 'Gestão Integrada Industrial')
+ON CONFLICT (id) DO NOTHING;
+
 -- 5.9 System Backups
 DROP POLICY IF EXISTS "backups_policy_all" ON public.system_backups;
 CREATE POLICY "backups_policy_all" ON public.system_backups
+    FOR ALL USING (true) WITH CHECK (true);
+
+-- 5.10 System Branding
+ALTER TABLE public.system_branding ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "system_branding_policy_all" ON public.system_branding;
+CREATE POLICY "system_branding_policy_all" ON public.system_branding
     FOR ALL USING (true) WITH CHECK (true);
 
 -- ==============================================================================

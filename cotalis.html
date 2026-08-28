@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>JP3D — Gescomp ERP Industrial de Impressão 3D, Compras, Produção & Governança</title>
-<meta name="description" content="Gescomp ERP JP3D: Gestão completa de compras, suprimentos, tarefas, cotações, vendas, BOM multinível, produção e suporte." />
+<title>Fluxa ERP Industrial — Gestão Integrada de Compras, PCP & Produção</title>
+<meta name="description" content="Fluxa ERP JP3D: Gestão completa de compras, suprimentos, tarefas, cotações, vendas, BOM multinível, produção e suporte." />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230f766e'/%3E%3Cpath d='M6 15V9l3 3 3-4 3 5 3-6' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -847,7 +847,7 @@ const EMPTY = {
 let DB = load();
 function load(){
   try{
-    const raw = localStorage.getItem('gescomp.db') || localStorage.getItem('cotalis.db');
+    const raw = localStorage.getItem('fluxa.db') || localStorage.getItem('cotalis.db');
     if(!raw) return migrateDB(structuredClone(EMPTY));
     const parsed = JSON.parse(raw);
     // Deep merge: campos novos do EMPTY não são sobrescritos por dados antigos
@@ -859,7 +859,7 @@ function load(){
     // M-02: aplicar migrações de schema
     return migrateDB(db);
   }catch(e){
-    console.error('[Gescomp] Erro ao carregar DB:', e);
+    console.error('[Fluxa] Erro ao carregar DB:', e);
     return migrateDB(structuredClone(EMPTY));
   }
 }
@@ -869,7 +869,7 @@ function save(){
     DB.notifications = DB.notifications.slice(-500);
   }
   try {
-    localStorage.setItem('gescomp.db', JSON.stringify(DB));
+    localStorage.setItem('fluxa.db', JSON.stringify(DB));
     localStorage.setItem('cotalis.db', JSON.stringify(DB));
     // Sincronização em tempo real com o backend Express / SQLite (data.db)
     const token = sessionStorage.getItem('jp3d_token');
@@ -880,17 +880,17 @@ function save(){
         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       },
       body: JSON.stringify(DB)
-    }).catch(err => console.warn('[Gescomp Sync] Backend temporariamente indisponível:', err));
+    }).catch(err => console.warn('[Fluxa Sync] Backend temporariamente indisponível:', err));
   } catch(e) {
-    console.error('[Gescomp] Falha ao salvar no localStorage (possivelmente cheio):', e);
+    console.error('[Fluxa] Falha ao salvar no localStorage (possivelmente cheio):', e);
     // Último recurso: podar mais agressivamente e tentar novamente
     if(DB.notifications) DB.notifications = DB.notifications.slice(-100);
     if(DB.history) DB.history = DB.history.slice(-200);
     try { 
-      localStorage.setItem('gescomp.db', JSON.stringify(DB)); 
+      localStorage.setItem('fluxa.db', JSON.stringify(DB)); 
       localStorage.setItem('cotalis.db', JSON.stringify(DB));
     } catch(e2) {
-      console.error('[Gescomp] Falha crítica de persistência.', e2);
+      console.error('[Fluxa] Falha crítica de persistência.', e2);
     }
   }
 }
@@ -1776,11 +1776,11 @@ const NAV_GROUPS = [
   {
     titulo: 'Compras',
     items: [
-      { p: '/gescomp', label: 'Gescomp (Tarefas & Listas)', ic: 'check', count: () => {
+      { p: '/fluxa', label: 'Fluxa (Tarefas & Listas)', ic: 'check', count: () => {
         const u = getCurrentUser();
         if(!u) return 0;
-        const tasks = DB.gescompTasks ? DB.gescompTasks.filter(t => t.userId === u.id && !t.completed) : [];
-        const items = DB.gescompShoppingList ? DB.gescompShoppingList.filter(i => i.userId === u.id && !i.completed) : [];
+        const tasks = DB.fluxaTasks ? DB.fluxaTasks.filter(t => t.userId === u.id && !t.completed) : [];
+        const items = DB.fluxaShoppingList ? DB.fluxaShoppingList.filter(i => i.userId === u.id && !i.completed) : [];
         return tasks.length + items.length;
       }},
       { p: '/cotacoes', label: 'Cotações & RFQ', ic: 'cot', count: () => (DB.quotations||[]).filter(q => q.status==='aguardando_resposta'||q.status==='aguardando_aprovacao').length },
@@ -6375,7 +6375,7 @@ const App = {
     toast('OP de Retrabalho gerada e vinculada!', 'success');
   },
 
-  /* Módulo Gescomp — Integração Supabase & Local Fallback */
+  /* Módulo Fluxa — Integração Supabase & Local Fallback */
   getSupabaseClient(){
     if(window._supabaseClient) return window._supabaseClient;
     const url = window.VITE_SUPABASE_URL || (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || localStorage.getItem('VITE_SUPABASE_URL') || '';
@@ -6389,14 +6389,14 @@ const App = {
     return null;
   },
 
-  addGescompTask(e){
+  addFluxaTask(e){
     e.preventDefault();
     const u = getCurrentUser();
     if(!u) return;
-    const input = document.getElementById('gescompTaskInput');
+    const input = document.getElementById('fluxaTaskInput');
     const text = input ? input.value.trim() : '';
     if(!text) return;
-    if(!DB.gescompTasks) DB.gescompTasks = [];
+    if(!DB.fluxaTasks) DB.fluxaTasks = [];
     const newTask = {
       id: uid('gtask'),
       userId: u.id,
@@ -6404,7 +6404,7 @@ const App = {
       completed: false,
       createdAt: new Date().toISOString()
     };
-    DB.gescompTasks.unshift(newTask);
+    DB.fluxaTasks.unshift(newTask);
     commit();
     input.value = '';
 
@@ -6413,10 +6413,10 @@ const App = {
       sb.from('tasks').insert([{ texto: text, concluido: false, usuario_id: u.id }])
         .then(({ error }) => { if(error) console.warn('[Supabase Tasks Insert Error]', error); });
     }
-    toast('Tarefa adicionada à sua lista Gescomp!', 'success');
+    toast('Tarefa adicionada à sua lista Fluxa!', 'success');
   },
-  toggleGescompTask(taskId){
-    const t = (DB.gescompTasks||[]).find(x => x.id === taskId);
+  toggleFluxaTask(taskId){
+    const t = (DB.fluxaTasks||[]).find(x => x.id === taskId);
     if(t){
       t.completed = !t.completed;
       commit();
@@ -6427,8 +6427,8 @@ const App = {
       }
     }
   },
-  deleteGescompTask(taskId){
-    DB.gescompTasks = (DB.gescompTasks||[]).filter(x => x.id !== taskId);
+  deleteFluxaTask(taskId){
+    DB.fluxaTasks = (DB.fluxaTasks||[]).filter(x => x.id !== taskId);
     commit();
     const sb = App.getSupabaseClient();
     if(sb){
@@ -6437,10 +6437,10 @@ const App = {
     }
     toast('Tarefa removida.', 'info');
   },
-  clearCompletedGescompTasks(){
+  clearCompletedFluxaTasks(){
     const u = getCurrentUser();
     if(!u) return;
-    DB.gescompTasks = (DB.gescompTasks||[]).filter(x => x.userId !== u.id || !x.completed);
+    DB.fluxaTasks = (DB.fluxaTasks||[]).filter(x => x.userId !== u.id || !x.completed);
     commit();
     const sb = App.getSupabaseClient();
     if(sb){
@@ -6450,16 +6450,16 @@ const App = {
     toast('Tarefas concluídas removidas.', 'info');
   },
 
-  addGescompShoppingItem(e){
+  addFluxaShoppingItem(e){
     e.preventDefault();
     const u = getCurrentUser();
     if(!u) return;
-    const descInput = document.getElementById('gescompShopDesc');
-    const qtdInput = document.getElementById('gescompShopQtd');
+    const descInput = document.getElementById('fluxaShopDesc');
+    const qtdInput = document.getElementById('fluxaShopQtd');
     const text = descInput ? descInput.value.trim() : '';
     const quantity = qtdInput ? parseFloat(qtdInput.value) || 1 : 1;
     if(!text) return;
-    if(!DB.gescompShoppingList) DB.gescompShoppingList = [];
+    if(!DB.fluxaShoppingList) DB.fluxaShoppingList = [];
     const newItem = {
       id: uid('gshop'),
       userId: u.id,
@@ -6468,7 +6468,7 @@ const App = {
       completed: false,
       createdAt: new Date().toISOString()
     };
-    DB.gescompShoppingList.unshift(newItem);
+    DB.fluxaShoppingList.unshift(newItem);
     commit();
     descInput.value = '';
     qtdInput.value = '1';
@@ -6478,10 +6478,10 @@ const App = {
       sb.from('compras').insert([{ texto: text, quantidade, concluido: false, usuario_id: u.id }])
         .then(({ error }) => { if(error) console.warn('[Supabase Compras Insert Error]', error); });
     }
-    toast('Item adicionado à sua lista de compras Gescomp!', 'success');
+    toast('Item adicionado à sua lista de compras Fluxa!', 'success');
   },
-  toggleGescompShoppingItem(itemId){
-    const i = (DB.gescompShoppingList||[]).find(x => x.id === itemId);
+  toggleFluxaShoppingItem(itemId){
+    const i = (DB.fluxaShoppingList||[]).find(x => x.id === itemId);
     if(i){
       i.completed = !i.completed;
       commit();
@@ -6492,8 +6492,8 @@ const App = {
       }
     }
   },
-  deleteGescompShoppingItem(itemId){
-    DB.gescompShoppingList = (DB.gescompShoppingList||[]).filter(x => x.id !== itemId);
+  deleteFluxaShoppingItem(itemId){
+    DB.fluxaShoppingList = (DB.fluxaShoppingList||[]).filter(x => x.id !== itemId);
     commit();
     const sb = App.getSupabaseClient();
     if(sb){
@@ -6502,10 +6502,10 @@ const App = {
     }
     toast('Item removido.', 'info');
   },
-  clearCompletedGescompShopping(){
+  clearCompletedFluxaShopping(){
     const u = getCurrentUser();
     if(!u) return;
-    DB.gescompShoppingList = (DB.gescompShoppingList||[]).filter(x => x.userId !== u.id || !x.completed);
+    DB.fluxaShoppingList = (DB.fluxaShoppingList||[]).filter(x => x.userId !== u.id || !x.completed);
     commit();
     const sb = App.getSupabaseClient();
     if(sb){
@@ -6515,15 +6515,15 @@ const App = {
     toast('Itens concluídos removidos.', 'info');
   },
 
-  gescompClearAll(tab='tasks'){
+  fluxaClearAll(tab='tasks'){
     confirmDialog(
-      'Limpar Todas as Listas Gescomp',
+      'Limpar Todas as Listas Fluxa',
       'Deseja limpar permanentemente todas as suas tarefas e lista de compras?',
       () => {
         const u = getCurrentUser();
         if(!u) return;
-        DB.gescompTasks = (DB.gescompTasks||[]).filter(x => x.userId !== u.id);
-        DB.gescompShoppingList = (DB.gescompShoppingList||[]).filter(x => x.userId !== u.id);
+        DB.fluxaTasks = (DB.fluxaTasks||[]).filter(x => x.userId !== u.id);
+        DB.fluxaShoppingList = (DB.fluxaShoppingList||[]).filter(x => x.userId !== u.id);
         commit();
         toast('Listas limpas com sucesso!', 'info');
       },
@@ -6535,15 +6535,15 @@ const App = {
 /* ============================ VISÃO DO MÓDULO GESCOMP ============================ */
 let GESCOMP_TAB = 'tasks';
 
-function viewGescomp(){
+function viewFluxa(){
   const u = getCurrentUser();
   if(!u) return notFound();
 
-  if(!DB.gescompTasks) DB.gescompTasks = [];
-  if(!DB.gescompShoppingList) DB.gescompShoppingList = [];
+  if(!DB.fluxaTasks) DB.fluxaTasks = [];
+  if(!DB.fluxaShoppingList) DB.fluxaShoppingList = [];
 
-  const myTasks = DB.gescompTasks.filter(t => t.userId === u.id);
-  const myShopping = DB.gescompShoppingList.filter(i => i.userId === u.id);
+  const myTasks = DB.fluxaTasks.filter(t => t.userId === u.id);
+  const myShopping = DB.fluxaShoppingList.filter(i => i.userId === u.id);
 
   const pendingTasksCount = myTasks.filter(t => !t.completed).length;
   const pendingShoppingCount = myShopping.filter(i => !i.completed).length;
@@ -6551,20 +6551,20 @@ function viewGescomp(){
   const currentTab = ROUTE.params.tab || GESCOMP_TAB || 'tasks';
 
   return pageTitle(
-    'Módulo Gescomp — Tarefas & Suprimentos',
+    'Módulo Fluxa — Tarefas & Suprimentos',
     'Organização do dia a dia da equipe de compras: lista de tarefas e lista de compras rápidas'
   ) + `
   <div class="max-w-3xl mx-auto space-y-4">
-    <!-- Header Corporativo Sóbrio Gescomp (Tom Escuro + Âmbar/Dourado) -->
+    <!-- Header Corporativo Sóbrio Fluxa (Tom Escuro + Âmbar/Dourado) -->
     <div class="rounded-2xl border border-amber-500/30 bg-slate-900/95 p-4 shadow-xl text-white backdrop-blur">
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
         <div class="flex items-center gap-3">
           <div class="flex items-center justify-center h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-extrabold text-lg font-mono shadow-inner">
-            G
+            F
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h2 class="font-extrabold text-base tracking-tight text-white uppercase font-mono">GESCOMP</h2>
+              <h2 class="font-extrabold text-base tracking-tight text-white uppercase font-mono">FLUXA</h2>
               <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">SUPRIMENTOS & TAREFAS</span>
             </div>
             <p class="text-xs text-slate-400">Espaço de trabalho pessoal de <b class="text-amber-300">${esc(u.name)}</b></p>
@@ -6572,7 +6572,7 @@ function viewGescomp(){
         </div>
         <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
           <span class="text-xs text-slate-400 hidden sm:inline">Persistência automática</span>
-          <button onclick="App.gescompClearAll('${currentTab}')" class="px-3 py-1.5 rounded-xl border border-red-800/60 bg-red-950/40 hover:bg-red-900/60 text-red-300 text-xs font-semibold transition-colors flex items-center gap-1.5" title="Limpar todas as listas do usuário">
+          <button onclick="App.fluxaClearAll('${currentTab}')" class="px-3 py-1.5 rounded-xl border border-red-800/60 bg-red-950/40 hover:bg-red-900/60 text-red-300 text-xs font-semibold transition-colors flex items-center gap-1.5" title="Limpar todas as listas do usuário">
             ${icon('trash', 'w-3.5 h-3.5')} Limpar Tudo
           </button>
         </div>
@@ -6580,13 +6580,13 @@ function viewGescomp(){
 
       <!-- Abas Principais (Mobile-First / Touch) -->
       <div class="grid grid-cols-2 gap-2 pt-3">
-        <button onclick="GESCOMP_TAB='tasks'; App.go('/gescomp?tab=tasks')" 
+        <button onclick="GESCOMP_TAB='tasks'; App.go('/fluxa?tab=tasks')" 
           class="touch-btn flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-bold transition-all ${currentTab==='tasks'?'bg-amber-500 text-slate-950 shadow-lg font-extrabold scale-[1.01]':'bg-slate-800/80 text-slate-300 hover:bg-slate-800 border border-slate-700/60'}">
           ${icon('list', 'w-4 h-4')}
           <span>Lista de Tarefas</span>
           <span class="num px-2 py-0.5 rounded-full text-[10px] ${currentTab==='tasks'?'bg-slate-950/20 text-slate-950 font-black':'bg-amber-500/20 text-amber-300'}">${pendingTasksCount}</span>
         </button>
-        <button onclick="GESCOMP_TAB='shopping'; App.go('/gescomp?tab=shopping')" 
+        <button onclick="GESCOMP_TAB='shopping'; App.go('/fluxa?tab=shopping')" 
           class="touch-btn flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-bold transition-all ${currentTab==='shopping'?'bg-amber-500 text-slate-950 shadow-lg font-extrabold scale-[1.01]':'bg-slate-800/80 text-slate-300 hover:bg-slate-800 border border-slate-700/60'}">
           ${icon('boxes', 'w-4 h-4')}
           <span>Lista de Compras</span>
@@ -6596,18 +6596,18 @@ function viewGescomp(){
     </div>
 
     <!-- Conteúdo da Aba Ativa -->
-    ${currentTab==='tasks' ? viewGescompTasksTab(myTasks) : viewGescompShoppingTab(myShopping)}
+    ${currentTab==='tasks' ? viewFluxaTasksTab(myTasks) : viewFluxaShoppingTab(myShopping)}
   </div>`;
 }
 
-function viewGescompTasksTab(tasks){
+function viewFluxaTasksTab(tasks){
   const pending = tasks.filter(t => !t.completed);
   const completed = tasks.filter(t => t.completed);
 
   return card(`
     <div class="p-4 sm:p-6 space-y-4">
-      <form onsubmit="App.addGescompTask(event)" class="flex gap-2">
-        <input type="text" id="gescompTaskInput" placeholder="Nova tarefa (ex: Cotar filamento PETG com fornecedor Polímeros)..." required
+      <form onsubmit="App.addFluxaTask(event)" class="flex gap-2">
+        <input type="text" id="fluxaTaskInput" placeholder="Nova tarefa (ex: Cotar filamento PETG com fornecedor Polímeros)..." required
           class="${INP} !py-3 !text-sm border-amber-500/30 focus:border-amber-500 focus:ring-amber-500/30 flex-1" />
         <button type="submit" class="touch-btn px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm shadow-md transition-transform active:scale-95 flex items-center gap-1 shrink-0">
           ${icon('plus', 'w-5 h-5')}
@@ -6619,7 +6619,7 @@ function viewGescompTasksTab(tasks){
         <span class="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-mono text-[11px]">
           ${pending.length} Tarefa(s) Pendente(s) ${completed.length ? `• ${completed.length} Concluída(s)` : ''}
         </span>
-        ${completed.length ? `<button onclick="App.clearCompletedGescompTasks()" class="text-amber-600 dark:text-amber-400 hover:underline text-[11px] font-semibold">Limpar Concluídas (${completed.length})</button>` : ''}
+        ${completed.length ? `<button onclick="App.clearCompletedFluxaTasks()" class="text-amber-600 dark:text-amber-400 hover:underline text-[11px] font-semibold">Limpar Concluídas (${completed.length})</button>` : ''}
       </div>
 
       <div class="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
@@ -6634,11 +6634,11 @@ function viewGescompTasksTab(tasks){
         ` : tasks.map(t => `
           <div class="group flex items-center justify-between p-3.5 rounded-xl border ${t.completed ? 'bg-slate-100/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800/60 opacity-60' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xs hover:border-amber-500/40'} transition-all">
             <label class="flex items-center gap-3 flex-1 min-w-0 cursor-pointer select-none">
-              <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="App.toggleGescompTask('${t.id}')"
+              <input type="checkbox" ${t.completed ? 'checked' : ''} onchange="App.toggleFluxaTask('${t.id}')"
                 class="rounded border-slate-400 dark:border-slate-700 bg-slate-100 dark:bg-slate-950 text-amber-500 focus:ring-amber-500 h-5 w-5 shrink-0 transition-all cursor-pointer" />
               <span class="text-sm ${t.completed ? 'line-through text-slate-400 dark:text-slate-500 font-normal' : 'text-slate-800 dark:text-slate-100 font-medium'} truncate">${esc(t.text)}</span>
             </label>
-            <button onclick="App.deleteGescompTask('${t.id}')" title="Excluir tarefa" class="touch-btn p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors ml-2">
+            <button onclick="App.deleteFluxaTask('${t.id}')" title="Excluir tarefa" class="touch-btn p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors ml-2">
               ${icon('x', 'w-4 h-4')}
             </button>
           </div>
@@ -6648,19 +6648,19 @@ function viewGescompTasksTab(tasks){
   `);
 }
 
-function viewGescompShoppingTab(items){
+function viewFluxaShoppingTab(items){
   const pending = items.filter(i => !i.completed);
   const completed = items.filter(i => i.completed);
 
   return card(`
     <div class="p-4 sm:p-6 space-y-4">
-      <form onsubmit="App.addGescompShoppingItem(event)" class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+      <form onsubmit="App.addFluxaShoppingItem(event)" class="grid grid-cols-1 sm:grid-cols-12 gap-2">
         <div class="sm:col-span-8">
-          <input type="text" id="gescompShopDesc" placeholder="Item a comprar (ex: Bico de extrusão 1.2mm aço)..." required
+          <input type="text" id="fluxaShopDesc" placeholder="Item a comprar (ex: Bico de extrusão 1.2mm aço)..." required
             class="${INP} !py-3 !text-sm border-amber-500/30 focus:border-amber-500 focus:ring-amber-500/30" />
         </div>
         <div class="sm:col-span-2">
-          <input type="number" id="gescompShopQtd" value="1" min="0.001" step="any" placeholder="Qtd" required
+          <input type="number" id="fluxaShopQtd" value="1" min="0.001" step="any" placeholder="Qtd" required
             class="${INP} !py-3 !text-sm border-amber-500/30 focus:border-amber-500 focus:ring-amber-500/30 text-center font-bold" />
         </div>
         <div class="sm:col-span-2">
@@ -6675,7 +6675,7 @@ function viewGescompShoppingTab(items){
         <span class="font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-mono text-[11px]">
           ${pending.length} Item(ns) a Comprar ${completed.length ? `• ${completed.length} Concluído(s)` : ''}
         </span>
-        ${completed.length ? `<button onclick="App.clearCompletedGescompShopping()" class="text-amber-600 dark:text-amber-400 hover:underline text-[11px] font-semibold">Limpar Concluídos (${completed.length})</button>` : ''}
+        ${completed.length ? `<button onclick="App.clearCompletedFluxaShopping()" class="text-amber-600 dark:text-amber-400 hover:underline text-[11px] font-semibold">Limpar Concluídos (${completed.length})</button>` : ''}
       </div>
 
       <div class="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
@@ -6690,7 +6690,7 @@ function viewGescompShoppingTab(items){
         ` : items.map(i => `
           <div class="group flex items-center justify-between p-3.5 rounded-xl border ${i.completed ? 'bg-slate-100/70 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800/60 opacity-60' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xs hover:border-amber-500/40'} transition-all">
             <label class="flex items-center gap-3 flex-1 min-w-0 cursor-pointer select-none">
-              <input type="checkbox" ${i.completed ? 'checked' : ''} onchange="App.toggleGescompShoppingItem('${i.id}')"
+              <input type="checkbox" ${i.completed ? 'checked' : ''} onchange="App.toggleFluxaShoppingItem('${i.id}')"
                 class="rounded border-slate-400 dark:border-slate-700 bg-slate-100 dark:bg-slate-950 text-amber-500 focus:ring-amber-500 h-5 w-5 shrink-0 transition-all cursor-pointer" />
               <div class="truncate">
                 <span class="text-sm ${i.completed ? 'line-through text-slate-400 dark:text-slate-500 font-normal' : 'text-slate-800 dark:text-slate-100 font-semibold'}">${esc(i.text)}</span>
@@ -6700,7 +6700,7 @@ function viewGescompShoppingTab(items){
               <span class="num font-black text-xs px-2.5 py-1 rounded-lg ${i.completed ? 'bg-slate-200 dark:bg-slate-800 text-slate-500' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'}">
                 Qtd: ${i.quantity}
               </span>
-              <button onclick="App.deleteGescompShoppingItem('${i.id}')" title="Excluir item" class="touch-btn p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors">
+              <button onclick="App.deleteFluxaShoppingItem('${i.id}')" title="Excluir item" class="touch-btn p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors">
                 ${icon('x', 'w-4 h-4')}
               </button>
             </div>
@@ -6739,7 +6739,7 @@ function render(){
 
   let content;
   if(ROUTE.path==='/' || ROUTE.path==='') content = viewDashboard();
-  else if(ROUTE.path==='/gescomp' || ROUTE.path==='/tarefas') content = viewGescomp();
+  else if(ROUTE.path==='/fluxa' || ROUTE.path==='/tarefas') content = viewFluxa();
   else if(ROUTE.path==='/crm') content = viewCRM();
   else if(ROUTE.path==='/fluxo') content = viewPipelineFluxo();
   else if(ROUTE.path==='/vendas') content = viewVendas();

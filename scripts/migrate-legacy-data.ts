@@ -114,7 +114,7 @@ async function runHydration() {
   ]
 
   for (const prod of produtosMestres) {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('products')
       .upsert(prod, { onConflict: 'codigo' })
     if (error) console.warn('[Product warn]', prod.codigo, error.message)

@@ -16,7 +16,7 @@ foreach ($p in $portsToTry) {
         $check = Invoke-WebRequest -Uri "http://127.0.0.1:$p/" -UseBasicParsing -TimeoutSec 1
         if ($check.StatusCode -eq 200) {
             Write-Host "==========================================================" -ForegroundColor Cyan
-            Write-Host "  JP3D ERP Industrial (Gescomp) - Servidor Ja Ativo!" -ForegroundColor Green
+            Write-Host "  Fluxa ERP Industrial - Servidor Ja Ativo!" -ForegroundColor Green
             Write-Host "==========================================================" -ForegroundColor Cyan
             Write-Host "  O servidor ja esta em execucao na porta $p." -ForegroundColor Yellow
             Write-Host "  Abrindo no navegador: http://localhost:$p/" -ForegroundColor Green
@@ -46,7 +46,7 @@ if (-not $listener -or -not $listener.IsListening) {
 }
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "  JP3D ERP Industrial (Gescomp) - Servidor HTTP Local" -ForegroundColor Green
+Write-Host "  Fluxa ERP Industrial - Servidor HTTP Local" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "  Acesse no navegador: " -NoNewline
 Write-Host "http://localhost:$activePort/" -ForegroundColor Yellow
@@ -155,9 +155,11 @@ while ($listener.IsListening) {
         }
 
         # Servir Arquivos Estaticos
-        if ([string]::IsNullOrEmpty($rawUrl) -or $rawUrl -eq "/" -or $rawUrl -eq "cotalis.html") {
-            if (Test-Path (Join-Path $baseDir "Gescomp.html")) {
-                $rawUrl = "Gescomp.html"
+        if ([string]::IsNullOrEmpty($rawUrl) -or $rawUrl -eq "/" -or $rawUrl -eq "fluxa.html" -or $rawUrl -eq "Gescomp.html" -or $rawUrl -eq "cotalis.html") {
+            if (Test-Path (Join-Path $baseDir "index.html")) {
+                $rawUrl = "index.html"
+            } elseif (Test-Path (Join-Path $baseDir "fluxa.html")) {
+                $rawUrl = "fluxa.html"
             } else {
                 $rawUrl = "cotalis.html"
             }

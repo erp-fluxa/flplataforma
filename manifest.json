@@ -1,16 +1,17 @@
 {
-  "name": "Gescomp ERP Industrial",
-  "short_name": "Gescomp ERP",
-  "description": "Sistema Único Integrado de Gestão ERP, Compras, PCP & Estoque",
+  "name": "Fluxa ERP Industrial",
+  "short_name": "Fluxa ERP",
+  "description": "Sistema Integrado de Gestão ERP, Compras, PCP, Produção e Estoque",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#070D1F",
+  "theme_color": "#070D1F",
   "icons": [
     {
-      "src": "assets/logo_gescomp_monograma_transparente.png",
-      "sizes": "400x400",
-      "type": "image/png"
+      "src": "assets/fluxa_logo_icone.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
