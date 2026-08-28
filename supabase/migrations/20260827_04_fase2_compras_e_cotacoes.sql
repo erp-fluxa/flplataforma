@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS public.suppliers (
     telefone TEXT,
     cidade TEXT,
     uf TEXT,
-    categorias TEXT[] DEFAULT '{}',
+    categorias TEXT[] DEFAULT ARRAY[]::TEXT[],
     ativo BOOLEAN NOT NULL DEFAULT TRUE,
     observacoes TEXT,
     criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()

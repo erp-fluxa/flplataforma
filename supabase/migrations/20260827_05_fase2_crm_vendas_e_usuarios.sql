@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- FASE 2.4: CRM, CLIENTES, FUNIL DE VENDAS, PEDIDOS DE VENDA & USUÁRIOS (RBAC)
--- Migration 05: 20260827_05_fase2_crm_vendas_e_usuarios.sql
+-- Migration 05: 20260827_05_fase2_crm_vendas_e_usuarios.sql (Corrigida)
 -- ==============================================================================
 
 -- 1. CLIENTES & CONTATOS COMERCIAIS
@@ -79,15 +79,15 @@ CREATE TABLE IF NOT EXISTS public.roles (
     id TEXT PRIMARY KEY,
     nome TEXT NOT NULL,
     descricao TEXT,
-    permissoes TEXT[] NOT NULL DEFAULT '{}'
+    permissoes JSONB DEFAULT '[]'::jsonb
 );
 
 INSERT INTO public.roles (id, nome, descricao, permissoes) VALUES
-    ('super_admin', 'Super Administrador', 'Acesso irrestrito a todas as funções e finanças', ARRAY['*']),
-    ('admin', 'Administrador', 'Gestão geral do sistema e aprovações', ARRAY['*']),
-    ('comprador', 'Comprador Industrial', 'Gestão de cotações RFQ, fornecedores e pedidos', ARRAY['compras', 'estoque_leitura', 'produtos_leitura']),
-    ('producao', 'Engenharia / PCP', 'Ordens de produção, Kanban e fichas técnicas', ARRAY['producao', 'estoque', 'produtos']),
-    ('comercial', 'Comercial & Vendas', 'CRM, funil de oportunidades e pedidos de venda', ARRAY['vendas', 'crm', 'produtos_leitura'])
+    ('super_admin', 'Super Administrador', 'Acesso irrestrito a todas as funções e finanças', '["*"]'::jsonb),
+    ('admin', 'Administrador', 'Gestão geral do sistema e aprovações', '["*"]'::jsonb),
+    ('comprador', 'Comprador Industrial', 'Gestão de cotações RFQ, fornecedores e pedidos', '["compras", "estoque_leitura", "produtos_leitura"]'::jsonb),
+    ('producao', 'Engenharia / PCP', 'Ordens de produção, Kanban e fichas técnicas', '["producao", "estoque", "produtos"]'::jsonb),
+    ('comercial', 'Comercial & Vendas', 'CRM, funil de oportunidades e pedidos de venda', '["vendas", "crm", "produtos_leitura"]'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 
 -- 5. HABILITAÇÃO DO ROW LEVEL SECURITY
