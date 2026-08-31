@@ -20,6 +20,7 @@ export interface User {
   roleId: string;
   role?: UserRole;
   permissoes?: string[];
+  allowedCompanyIds?: string[];
   active: boolean;
   preferences?: UserPreferences;
   createdAt?: string;
@@ -34,9 +35,13 @@ export interface Company {
   fantasia?: string;
   cnpj: string;
   inscricaoEstadual?: string;
+  inscricaoMunicipal?: string;
   endereco?: string;
+  numero?: string;
+  bairro?: string;
   cidade?: string;
   uf?: string;
+  cep?: string;
   telefone?: string;
   email?: string;
   regimeTributario?: string;
@@ -49,6 +54,8 @@ export interface Company {
   isMatriz?: boolean;
   ativa?: boolean;
   active?: boolean;
+  excluidaEm?: string;
+  criadoEm?: string;
 }
 
 export interface MaterialCategory {

@@ -33,6 +33,9 @@ interface DbContextType {
   excluirVendaComEstorno: (pvId: string, actorName: string) => Promise<{ success: boolean; error?: string; detalhes?: string }>;
   excluirOpComEstorno: (opId: string, actorName: string) => Promise<{ success: boolean; error?: string; detalhes?: string }>;
   reconciliarEstoque: (actorName: string) => Promise<{ success: boolean; reservasRemovidas: number; detalhes?: string }>;
+  salvarEmpresa: (company: Company, actorName: string) => Promise<{ success: boolean; error?: string }>;
+  excluirEmpresa: (companyId: string, actorName: string) => Promise<{ success: boolean; error?: string }>;
+  selecionarEmpresaAtiva: (companyId: string) => Promise<void>;
 }
 
 const DbContext = createContext<DbContextType | null>(null);
@@ -76,6 +79,8 @@ function deepMergeDbState(base: DatabaseState, userState: Partial<DatabaseState>
     ...base,
     ...userState,
     company: Object.assign({}, base.company, userState.company),
+    companies: mergeArrayById(base.companies || [], userState.companies || []),
+    currentCompanyId: userState.currentCompanyId || base.currentCompanyId || 'comp-1',
     customLogos: Object.assign({}, base.customLogos, userState.customLogos),
     users: mergeArrayById(base.users, userState.users),
     roles: mergeArrayById((base as any).roles || [], (userState as any).roles || []),
@@ -130,6 +135,8 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const realtimeChannelRef = React.useRef<any>(null);
+  const lastSyncTimestampRef = React.useRef<string>('');
 
   // Sincronização centralizada a partir do Supabase Cloud
   const syncFromCloud = useCallback(async () => {
@@ -149,18 +156,23 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
       if (!error && Array.isArray(data) && data.length > 0 && data[0]?.dados) {
         const cloudDb = data[0].dados;
-        setDb(prev => {
-          const merged = deepMergeDbState(prev, cloudDb);
-          merged.lastBackup = data[0].criado_em || new Date().toISOString();
+        const backupTimestamp = data[0].criado_em || new Date().toISOString();
 
-          STORAGE_KEYS.forEach(key => {
-            try {
-              localStorage.setItem(key, JSON.stringify(merged));
-            } catch (_) {}
+        if (backupTimestamp !== lastSyncTimestampRef.current) {
+          lastSyncTimestampRef.current = backupTimestamp;
+          setDb(prev => {
+            const merged = deepMergeDbState(prev, cloudDb);
+            merged.lastBackup = backupTimestamp;
+
+            STORAGE_KEYS.forEach(key => {
+              try {
+                localStorage.setItem(key, JSON.stringify(merged));
+              } catch (_) {}
+            });
+
+            return merged;
           });
-
-          return merged;
-        });
+        }
       }
     } catch (e) {
       console.warn('[Supabase Sync Error]', e);
@@ -172,12 +184,30 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   // Salvar no LocalStorage, Supabase e disparar broadcast para todos os aparelhos
   const persistAndBroadcast = useCallback(async (newDb: DatabaseState, actionName: string = 'STATE_SYNC') => {
+    const nowIso = new Date().toISOString();
+    lastSyncTimestampRef.current = nowIso;
+
+    // 1. Salvar no LocalStorage (disparará evento 'storage' para outras abas no mesmo dispositivo)
     STORAGE_KEYS.forEach(key => {
       try {
         localStorage.setItem(key, JSON.stringify(newDb));
       } catch (_) {}
     });
 
+    // 2. Disparar evento broadcast WebSocket imediatamente se o canal estiver pronto
+    if (realtimeChannelRef.current) {
+      try {
+        realtimeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'fluxa_sync',
+          payload: { action: actionName, timestamp: Date.now(), dados: newDb }
+        });
+      } catch (wsErr) {
+        console.warn('[Realtime Broadcast Warn]', wsErr);
+      }
+    }
+
+    // 3. Persistir Snapshot no Banco de Dados Supabase
     const sb = getSupabase();
     if (sb) {
       try {
@@ -186,14 +216,6 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           dados: newDb,
           tipo: 'auto_sync'
         }]);
-
-        // Dispara evento broadcast WebSocket para outros navegadores/dispositivos
-        const channel = sb.channel('fluxa_realtime_sync');
-        channel.send({
-          type: 'broadcast',
-          event: 'fluxa_sync',
-          payload: { action: actionName, timestamp: Date.now() }
-        });
       } catch (err) {
         console.warn('[Supabase Insert Error]', err);
       }
@@ -207,6 +229,166 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       return next;
     });
   }, [persistAndBroadcast]);
+
+  // SALVAR / CRIAR EMPRESA (Multi-CNPJ com Validação Rigorosa)
+  const salvarEmpresa = useCallback(async (empresaData: Company, actorName: string): Promise<{ success: boolean; error?: string }> => {
+    // 1. Validação Matemática de CNPJ (Módulo 11)
+    if (!validarCNPJ(empresaData.cnpj)) {
+      return {
+        success: false,
+        error: 'CNPJ inválido! O número informado não passou na validação dos dígitos verificadores.'
+      };
+    }
+
+    const cnpjLimpo = empresaData.cnpj.replace(/\D/g, '');
+    const cnpjFormatado = mascaraCNPJ(empresaData.cnpj);
+
+    // 2. Checagem de Duplicidade de CNPJ
+    const duplicado = (db.companies || []).find(c =>
+      c.id !== empresaData.id &&
+      c.cnpj.replace(/\D/g, '') === cnpjLimpo &&
+      c.ativa !== false
+    );
+
+    if (duplicado) {
+      return {
+        success: false,
+        error: `Já existe uma empresa cadastrada com o CNPJ ${cnpjFormatado} (${duplicado.nomeFantasia || duplicado.razaoSocial}).`
+      };
+    }
+
+    let result = { success: true, error: '' };
+    await updateDb(prev => {
+      const now = new Date().toISOString();
+      const existing = (prev.companies || []).find(c => c.id === empresaData.id);
+      const isFirstCompany = (prev.companies || []).filter(c => c.ativa !== false).length === 0;
+
+      const isMatriz = empresaData.isMatriz || isFirstCompany;
+      const empresaFormatada: Company = {
+        ...empresaData,
+        id: empresaData.id || uid('comp'),
+        nome: empresaData.nome || empresaData.razaoSocial || empresaData.nomeFantasia || 'Nova Empresa',
+        razaoSocial: empresaData.razaoSocial || empresaData.nome,
+        nomeFantasia: empresaData.nomeFantasia || empresaData.fantasia || empresaData.nome,
+        fantasia: empresaData.fantasia || empresaData.nomeFantasia || empresaData.nome,
+        cnpj: cnpjFormatado,
+        isMatriz,
+        ativa: empresaData.ativa !== false,
+        criadoEm: empresaData.criadoEm || now
+      };
+
+      let companies = (prev.companies || []).map(c => {
+        if (c.id === empresaFormatada.id) return empresaFormatada;
+        if (isMatriz && c.id !== empresaFormatada.id) return { ...c, isMatriz: false };
+        return c;
+      });
+
+      if (!existing) {
+        if (isMatriz) {
+          companies = companies.map(c => ({ ...c, isMatriz: false }));
+        }
+        companies.push(empresaFormatada);
+      }
+
+      let company = prev.company;
+      if (prev.currentCompanyId === empresaFormatada.id || isMatriz || companies.length === 1) {
+        company = empresaFormatada;
+      }
+
+      const auditLog = {
+        id: uid('log'),
+        timestamp: now,
+        action: existing ? 'COMPANY_UPDATED' : 'COMPANY_CREATED',
+        actor: { id: 'usr', name: actorName || 'Super Admin' },
+        target: { tipo: 'EMPRESA', codigo: empresaFormatada.cnpj },
+        details: `Empresa [${empresaFormatada.cnpj}] ${empresaFormatada.nomeFantasia || empresaFormatada.nome} ${existing ? 'atualizada' : 'cadastrada'} com sucesso.`
+      };
+
+      return {
+        ...prev,
+        companies,
+        company,
+        currentCompanyId: prev.currentCompanyId || empresaFormatada.id,
+        auditLogs: [auditLog, ...(prev.auditLogs || [])]
+      };
+    }, 'COMPANY_SAVED');
+
+    return result;
+  }, [db.companies, updateDb]);
+
+  // EXCLUIR EMPRESA COM SOFT DELETE (Multi-CNPJ)
+  const excluirEmpresa = useCallback(async (companyId: string, actorName: string): Promise<{ success: boolean; error?: string; vinculos?: { pedidos: number; ops: number; compras: number } }> => {
+    const ativas = (db.companies || []).filter(c => c.ativa !== false);
+    if (ativas.length <= 1) {
+      return {
+        success: false,
+        error: 'Não é permitido desativar a única empresa ativa do sistema.'
+      };
+    }
+
+    const target = (db.companies || []).find(c => c.id === companyId);
+    if (!target) {
+      return { success: false, error: 'Empresa não encontrada.' };
+    }
+
+    let result = { success: true, error: '' };
+    await updateDb(prev => {
+      const now = new Date().toISOString();
+
+      // Aplica Soft Delete
+      const companies = (prev.companies || []).map(c => {
+        if (c.id === companyId) {
+          return {
+            ...c,
+            ativa: false,
+            excluidaEm: now
+          };
+        }
+        return c;
+      });
+
+      let currentCompanyId = prev.currentCompanyId;
+      let company = prev.company;
+
+      if (currentCompanyId === companyId) {
+        const nextActive = companies.find(c => c.ativa !== false && c.isMatriz) || companies.find(c => c.ativa !== false) || companies[0];
+        currentCompanyId = nextActive.id;
+        company = nextActive;
+      }
+
+      const auditLog = {
+        id: uid('log'),
+        timestamp: now,
+        action: 'COMPANY_SOFT_DELETED',
+        actor: { id: 'usr', name: actorName || 'Super Admin' },
+        target: { tipo: 'EMPRESA', codigo: target.cnpj },
+        details: `Empresa [${target.cnpj}] ${target.nomeFantasia || target.nome} desativada (soft delete) por ${actorName || 'Super Admin'}.`
+      };
+
+      return {
+        ...prev,
+        companies,
+        company,
+        currentCompanyId,
+        auditLogs: [auditLog, ...(prev.auditLogs || [])]
+      };
+    }, 'COMPANY_DELETED');
+
+    return result;
+  }, [db.companies, updateDb]);
+
+  // SELECIONAR EMPRESA ATIVA
+  const selecionarEmpresaAtiva = useCallback(async (companyId: string) => {
+    await updateDb(prev => {
+      const selected = (prev.companies || []).find(c => c.id === companyId);
+      if (!selected) return prev;
+      return {
+        ...prev,
+        currentCompanyId: companyId,
+        company: selected
+      };
+    }, 'COMPANY_CHANGED');
+  }, [updateDb]);
 
   // Upload de logotipos com versionamento
   const uploadLogo = useCallback(async (type: keyof CustomLogos, dataUrl: string) => {
@@ -919,25 +1101,73 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     return result;
   }, [updateDb]);
 
-  // Subscrição WebSocket Realtime no carregamento
+  // Subscrição WebSocket Realtime e Sincronização Contínua
   useEffect(() => {
     syncFromCloud();
 
+    // 1. Sincronização instantânea entre abas no mesmo computador/navegador
+    const handleStorageChange = (e: StorageEvent) => {
+      if (STORAGE_KEYS.includes(e.key || '') && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed && typeof parsed === 'object') {
+            setDb(prev => deepMergeDbState(prev, parsed));
+          }
+        } catch (_) {}
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    // 2. Conexão WebSocket Realtime do Supabase Cloud
     const sb = getSupabase();
+    let channel: any = null;
+
     if (sb) {
-      const channel = sb.channel('fluxa_realtime_sync')
+      channel = sb.channel('fluxa_realtime_sync')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'system_backups' }, () => {
           syncFromCloud();
         })
-        .on('broadcast', { event: 'fluxa_sync' }, () => {
-          syncFromCloud();
+        .on('broadcast', { event: 'fluxa_sync' }, (payload: any) => {
+          if (payload?.payload?.dados) {
+            setDb(prev => deepMergeDbState(prev, payload.payload.dados));
+          } else {
+            syncFromCloud();
+          }
         })
-        .subscribe();
-
-      return () => {
-        sb.removeChannel(channel);
-      };
+        .subscribe((status: string) => {
+          if (status === 'SUBSCRIBED') {
+            realtimeChannelRef.current = channel;
+          }
+        });
     }
+
+    // 3. Heartbeat de segurança a cada 5 segundos (garante recuperação instantânea em oscilações de rede)
+    const pollerInterval = setInterval(async () => {
+      if (document.hidden) return;
+      const client = getSupabase();
+      if (!client) return;
+
+      try {
+        const { data } = await client
+          .from('system_backups')
+          .select('criado_em')
+          .order('criado_em', { ascending: false })
+          .limit(1);
+
+        if (data && data[0]?.criado_em && data[0].criado_em !== lastSyncTimestampRef.current) {
+          syncFromCloud();
+        }
+      } catch (_) {}
+    }, 5000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(pollerInterval);
+      if (sb && channel) {
+        sb.removeChannel(channel);
+        realtimeChannelRef.current = null;
+      }
+    };
   }, [syncFromCloud]);
 
   return (
@@ -955,7 +1185,10 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       processarVendaAutomatica,
       excluirVendaComEstorno,
       excluirOpComEstorno,
-      reconciliarEstoque
+      reconciliarEstoque,
+      salvarEmpresa,
+      excluirEmpresa,
+      selecionarEmpresaAtiva
     }}>
       {children}
     </DbContext.Provider>

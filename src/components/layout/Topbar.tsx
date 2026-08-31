@@ -12,13 +12,22 @@ interface TopbarProps {
 
 export const Topbar: React.FC<TopbarProps> = ({ onOpenMobileMenu, title, onNavigate }) => {
   const { user, logout } = useAuth();
-  const { db, updateDb } = useDb();
+  const { db, selecionarEmpresaAtiva } = useDb();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const currentCompany = db.companies.find(c => c.id === db.currentCompanyId) || db.company;
+  const isSuperAdmin = user?.roleId === 'super_admin' || user?.roleId === 'admin' || user?.role?.name?.toLowerCase().includes('admin') || user?.username === 'admin';
+
+  const allActiveCompanies = (db.companies || []).filter(c => c.ativa !== false);
+  const baseCompanies = allActiveCompanies.length > 0 ? allActiveCompanies : (db.company ? [db.company] : []);
+
+  const companiesList = isSuperAdmin
+    ? baseCompanies
+    : baseCompanies.filter(c => !user?.allowedCompanyIds || user.allowedCompanyIds.length === 0 || user.allowedCompanyIds.includes(c.id));
+
+  const currentCompany = companiesList.find(c => c.id === db.currentCompanyId) || db.company || companiesList[0];
 
   const handleSelectCompany = (companyId: string) => {
-    updateDb(d => ({ ...d, currentCompanyId: companyId }), 'COMPANY_CHANGED');
+    selecionarEmpresaAtiva(companyId);
   };
 
   return (
@@ -37,15 +46,15 @@ export const Topbar: React.FC<TopbarProps> = ({ onOpenMobileMenu, title, onNavig
 
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Seletor de Unidade / Empresa */}
-        {db.companies.length > 1 && (
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200">
+        {companiesList.length > 1 && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200">
             <Building2 className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" />
             <select
-              value={db.currentCompanyId}
+              value={db.currentCompanyId || currentCompany?.id}
               onChange={e => handleSelectCompany(e.target.value)}
-              className="bg-transparent border-0 outline-none text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
+              className="bg-transparent border-0 outline-none text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer max-w-[150px] sm:max-w-[220px] truncate"
             >
-              {db.companies.map(c => (
+              {companiesList.map(c => (
                 <option key={c.id} value={c.id} className="bg-slate-900 text-white">
                   {c.fantasia || c.nomeFantasia || c.nome}
                 </option>
