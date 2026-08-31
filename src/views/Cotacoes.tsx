@@ -1,10 +1,22 @@
 import React, { useState } from 'react';
-import { FileSpreadsheet, Plus, CheckCircle, Eye, ShoppingCart, Trash2, Edit, Power, PowerOff, Building, Sparkles, PackagePlus } from 'lucide-react';
+import { FileSpreadsheet, Plus, CheckCircle, Eye, ShoppingCart, Trash2, Edit, Power, PowerOff, Building, Sparkles, PackagePlus, Scale, Award, Clock, DollarSign, ArrowRight, UserCheck } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Badge, Modal } from '../components/ui';
 import { fmtMoeda, fmtQtd, fmtData, uid } from '../lib/formatters';
-import { Quotation, QuotationItem, QuotationSupplierPrice, PurchaseOrder, Product } from '../types';
+import { Quotation, QuotationItem, QuotationSupplierPrice, PurchaseOrder, Product, Supplier } from '../types';
+
+export interface FornecedorComparacao {
+  id: string;
+  fornecedorId?: string;
+  nomeFornecedor: string;
+  valorUnitario: number;
+  unidade: string;
+  quantidade: number;
+  prazo: string;
+  condicaoPagamento?: string;
+  observacao?: string;
+}
 
 export const Cotacoes: React.FC = () => {
   const { db, updateDb } = useDb();
@@ -16,6 +28,30 @@ export const Cotacoes: React.FC = () => {
   const [modalViewOpen, setModalViewOpen] = useState(false);
   const [selectedCotacao, setSelectedCotacao] = useState<Quotation | null>(null);
   const [editingCotId, setEditingCotId] = useState<string | null>(null);
+
+  // Comparador de Múltiplos Fornecedores Lado a Lado Dinâmico
+  const [fornecedoresComparacao, setFornecedoresComparacao] = useState<FornecedorComparacao[]>([
+    {
+      id: 'sup-1',
+      fornecedorId: db.suppliers[0]?.id || '',
+      nomeFornecedor: db.suppliers[0]?.razaoSocial || 'Fornecedor A (Distribuidora Principal)',
+      valorUnitario: 45.0,
+      unidade: 'UN',
+      quantidade: 10,
+      prazo: '5 dias úteis',
+      condicaoPagamento: '30 dias (Boleto)'
+    },
+    {
+      id: 'sup-2',
+      fornecedorId: db.suppliers[1]?.id || '',
+      nomeFornecedor: db.suppliers[1]?.razaoSocial || 'Fornecedor B (Fabricante Direto)',
+      valorUnitario: 42.5,
+      unidade: 'UN',
+      quantidade: 10,
+      prazo: '7 dias úteis',
+      condicaoPagamento: 'À vista (5% desc)'
+    }
+  ]);
 
   // Form Cotação
   const [novaDescricao, setNovaDescricao] = useState('');
@@ -316,27 +352,117 @@ export const Cotacoes: React.FC = () => {
     alert(`Pedido de Compra ${codigoPc} gerado com sucesso para ${sup.razaoSocial}! Valor: ${fmtMoeda(totalCents)}`);
   };
 
+  // FUNÇÕES DO COMPARADOR MULTI-FORNECEDORES DINÂMICO
+  const handleAddFornecedor = () => {
+    const proximoNum = fornecedoresComparacao.length + 1;
+    const supDefault = db.suppliers[fornecedoresComparacao.length % (db.suppliers.length || 1)];
+    const novaUnidade = fornecedoresComparacao[0]?.unidade || 'UN';
+    const novaQtd = fornecedoresComparacao[0]?.quantidade || 1;
+
+    setFornecedoresComparacao(prev => [
+      ...prev,
+      {
+        id: uid('sup-cot'),
+        fornecedorId: supDefault?.id || '',
+        nomeFornecedor: supDefault?.razaoSocial || `Fornecedor ${String.fromCharCode(64 + proximoNum)}`,
+        valorUnitario: 0,
+        unidade: novaUnidade,
+        quantidade: novaQtd,
+        prazo: '5 dias úteis',
+        condicaoPagamento: '30 dias'
+      }
+    ]);
+  };
+
+  const handleRemoveFornecedor = (id: string) => {
+    if (fornecedoresComparacao.length <= 1) {
+      alert('A comparação precisa ter pelo menos 1 fornecedor.');
+      return;
+    }
+    setFornecedoresComparacao(prev => prev.filter(f => f.id !== id));
+  };
+
+  const handleUpdateFornecedor = (id: string, fields: Partial<FornecedorComparacao>) => {
+    setFornecedoresComparacao(prev => prev.map(f => f.id === id ? { ...f, ...fields } : f));
+  };
+
+  const handleConverterComparacaoEmPedido = async (forn: FornecedorComparacao) => {
+    if (!forn.valorUnitario || forn.valorUnitario <= 0) {
+      alert('Informe o valor unitário do fornecedor antes de aprovar a compra.');
+      return;
+    }
+
+    const seq = (db.orders?.length || 0) + 1;
+    const codigoPc = `PC-${String(seq).padStart(4, '0')}`;
+    const totalCents = Math.round((forn.valorUnitario * forn.quantidade) * 100);
+
+    const novoPedido: PurchaseOrder = {
+      id: uid('pc'),
+      codigo: codigoPc,
+      fornecedorId: forn.fornecedorId || (db.suppliers[0]?.id || 'sup-1'),
+      status: 'aprovado',
+      valorTotalCents: totalCents,
+      condicaoPagamento: forn.condicaoPagamento || '30 dias',
+      previsaoEntrega: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+      companyId: db.currentCompanyId,
+      criadoEm: new Date().toISOString()
+    };
+
+    await updateDb(prev => ({
+      ...prev,
+      orders: [novoPedido, ...(prev.orders || [])],
+      auditLogs: [
+        {
+          id: uid('log'),
+          timestamp: new Date().toISOString(),
+          action: 'PURCHASE_ORDER_GENERATED_FROM_COMPARISON',
+          actor: { id: user?.id || 'admin', name: user?.name || 'Admin' },
+          target: { tipo: 'PEDIDO_COMPRA', codigo: codigoPc },
+          details: `Pedido de Compra ${codigoPc} gerado a partir do comparativo multi-fornecedor (${forn.nomeFornecedor} — Total: ${fmtMoeda(totalCents)}).`
+        },
+        ...(prev.auditLogs || [])
+      ]
+    }), 'PURCHASE_ORDER_GENERATED');
+
+    setModalComparativoOpen(false);
+    alert(`🎉 Pedido de Compra ${codigoPc} gerado com sucesso para ${forn.nomeFornecedor}!\nValor Total: ${fmtMoeda(totalCents)}`);
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
         <div>
           <h2 className="font-black text-base text-slate-900 dark:text-white flex items-center gap-2">
             <FileSpreadsheet className="w-5 h-5 text-brand-600 dark:text-teal-400" />
-            Cotações de Preço & RFQ
+            Cotações de Preço & Comparativo Multi-Fornecedores
           </h2>
           <p className="text-xs text-slate-500">
-            Comparativo de preços entre fornecedores, homologação de matérias-primas e aprovação de compras.
+            Comparativo de preços lado a lado entre fornecedores, cálculo automático e aprovação de compras.
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          size="sm"
-          icon={<Plus className="w-3.5 h-3.5" />}
-          onClick={handleOpenNew}
-        >
-          Nova Cotação
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Scale className="w-3.5 h-3.5 text-brand-600 dark:text-teal-400" />}
+            onClick={() => {
+              setSelectedCotacao(null);
+              setModalComparativoOpen(true);
+            }}
+          >
+            Comparar Fornecedores Lado a Lado
+          </Button>
+
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<Plus className="w-3.5 h-3.5" />}
+            onClick={handleOpenNew}
+          >
+            Nova Cotação
+          </Button>
+        </div>
       </div>
 
       <Card className="p-0 overflow-hidden">
@@ -669,100 +795,267 @@ export const Cotacoes: React.FC = () => {
         </form>
       </Modal>
 
-      {/* MODAL: MAPA DE PREÇOS E FORNECEDORES */}
+      {/* MODAL: COMPARADOR DE MÚLTIPLOS FORNECEDORES LADO A LADO */}
       <Modal
         isOpen={modalComparativoOpen}
         onClose={() => setModalComparativoOpen(false)}
-        title={`Mapa Comparativo de Preços — ${selectedCotacao?.codigo}`}
+        title={selectedCotacao ? `Comparativo de Preços — ${selectedCotacao.codigo}` : 'Comparador de Cotações (Múltiplos Fornecedores)'}
         maxWidth="4xl"
       >
         <div className="space-y-4 text-xs">
-          <p className="text-slate-600 dark:text-slate-300">
-            Insira os valores cotados por cada fornecedor para gerar o comparativo e emitir a Ordem de Compra.
-          </p>
+          {/* Topo Informativo e Ação de Adicionar Fornecedor */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
+            <div>
+              <h4 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                <Scale className="w-4 h-4 text-brand-600 dark:text-teal-400" />
+                Comparativo de Propostas Lado a Lado
+              </h4>
+              <p className="text-slate-500 text-[11px] mt-0.5">
+                Preencha os valores, prazos e condições de cada fornecedor. O total e o menor preço são calculados automaticamente.
+              </p>
+            </div>
 
-          <div className="space-y-4 overflow-x-auto">
-            {db.suppliers.map(sup => {
-              const cotItems = (db.quotationItems || []).filter(i => i.quotationId === selectedCotacao?.id);
-              let totalFornecedor = 0;
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Plus className="w-3.5 h-3.5" />}
+              onClick={handleAddFornecedor}
+            >
+              + Adicionar Fornecedor ({fornecedoresComparacao.length})
+            </Button>
+          </div>
 
-              return (
-                <div key={sup.id} className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/60 space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
-                    <div className="flex items-center gap-2">
-                      <Building className="w-4 h-4 text-brand-600 dark:text-teal-400" />
-                      <span className="font-extrabold text-sm text-slate-900 dark:text-white">{sup.razaoSocial}</span>
-                      <span className="text-[11px] text-slate-400">({sup.contatoNome || sup.email})</span>
+          {/* Grid de Fornecedores Lado a Lado (Scroll Horizontal Suave) */}
+          <div className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x">
+            {(() => {
+              // Cálculo do Menor Total para Destaque
+              const totaisValidos = fornecedoresComparacao
+                .map(f => ({ id: f.id, total: (f.valorUnitario || 0) * (f.quantidade || 0) }))
+                .filter(t => t.total > 0);
+              const menorTotal = totaisValidos.length > 0 ? Math.min(...totaisValidos.map(t => t.total)) : 0;
+              const maiorTotal = totaisValidos.length > 1 ? Math.max(...totaisValidos.map(t => t.total)) : 0;
+
+              return fornecedoresComparacao.map((forn, index) => {
+                const subtotal = (forn.valorUnitario || 0) * (forn.quantidade || 0);
+                const isMelhorPreco = subtotal > 0 && subtotal === menorTotal && fornecedoresComparacao.length > 1;
+                const economiaReais = maiorTotal > subtotal && isMelhorPreco ? maiorTotal - subtotal : 0;
+
+                return (
+                  <div
+                    key={forn.id}
+                    className={`w-[300px] sm:w-[330px] flex-shrink-0 snap-center rounded-2xl border p-4 transition-all space-y-3.5 flex flex-col justify-between ${
+                      isMelhorPreco
+                        ? 'bg-emerald-950/20 dark:bg-emerald-950/30 border-emerald-500/70 shadow-lg ring-2 ring-emerald-500/40'
+                        : 'bg-white dark:bg-slate-900/90 border-slate-200 dark:border-slate-800 shadow-sm hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      {/* Header do Card do Fornecedor */}
+                      <div className="flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-extrabold text-xs text-slate-500 dark:text-slate-400">
+                              Proposta #{index + 1}
+                            </span>
+                            {isMelhorPreco && (
+                              <Badge variant="success" className="animate-pulse">
+                                ⭐ MELHOR PREÇO
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="font-extrabold text-sm text-slate-900 dark:text-white block truncate max-w-[210px]">
+                            {forn.nomeFornecedor || `Fornecedor #${index + 1}`}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFornecedor(forn.id)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          title="Remover este fornecedor da comparação"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* 1. Seleção / Nome do Fornecedor */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Fornecedor
+                        </label>
+                        <select
+                          value={forn.fornecedorId || ''}
+                          onChange={e => {
+                            const supId = e.target.value;
+                            const supObj = db.suppliers.find(s => s.id === supId);
+                            handleUpdateFornecedor(forn.id, {
+                              fornecedorId: supId,
+                              nomeFornecedor: supObj ? (supObj.nomeFantasia || supObj.razaoSocial) : forn.nomeFornecedor
+                            });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-bold outline-none focus:border-brand-500 mb-1.5"
+                        >
+                          <option value="">Selecionar fornecedor cadastrado...</option>
+                          {db.suppliers.map(s => (
+                            <option key={s.id} value={s.id}>
+                              {s.nomeFantasia || s.razaoSocial} ({s.cnpj || 'CNPJ não informado'})
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          value={forn.nomeFornecedor}
+                          onChange={e => handleUpdateFornecedor(forn.id, { nomeFornecedor: e.target.value })}
+                          placeholder="Ou digite o nome do fornecedor..."
+                          className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs outline-none focus:border-brand-500"
+                        />
+                      </div>
+
+                      {/* 2. Valor Unitário & Unidade */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            Valor Unitário (R$) *
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[11px]">R$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={forn.valorUnitario || ''}
+                              onChange={e => handleUpdateFornecedor(forn.id, { valorUnitario: parseFloat(e.target.value) || 0 })}
+                              placeholder="0,00"
+                              className="w-full pl-8 pr-2 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold outline-none focus:border-brand-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            Unidade
+                          </label>
+                          <select
+                            value={forn.unidade}
+                            onChange={e => handleUpdateFornecedor(forn.id, { unidade: e.target.value })}
+                            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-bold outline-none focus:border-brand-500 font-mono"
+                          >
+                            <option value="UN">UN (Unidade)</option>
+                            <option value="KG">KG (Quilo)</option>
+                            <option value="M">M (Metro)</option>
+                            <option value="M²">M² (Metro²)</option>
+                            <option value="CX">CX (Caixa)</option>
+                            <option value="ROLO">ROLO (Rolo/Carretel)</option>
+                            <option value="PAR">PAR (Par)</option>
+                            <option value="L">L (Litro)</option>
+                            <option value="KIT">KIT (Conjunto)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* 3. Quantidade & Prazo de Entrega */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            Quantidade *
+                          </label>
+                          <input
+                            type="number"
+                            step="0.001"
+                            min="0.001"
+                            value={forn.quantidade || ''}
+                            onChange={e => handleUpdateFornecedor(forn.id, { quantidade: parseFloat(e.target.value) || 0 })}
+                            placeholder="1"
+                            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold outline-none focus:border-brand-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                            Prazo de Entrega
+                          </label>
+                          <input
+                            type="text"
+                            value={forn.prazo}
+                            onChange={e => handleUpdateFornecedor(forn.id, { prazo: e.target.value })}
+                            placeholder="Ex: 5 dias úteis"
+                            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs outline-none focus:border-brand-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* 4. Condições de Pagamento */}
+                      <div>
+                        <label className="block text-[10.5px] font-bold text-slate-500 mb-1">
+                          Condição de Pagamento
+                        </label>
+                        <input
+                          type="text"
+                          value={forn.condicaoPagamento || ''}
+                          onChange={e => handleUpdateFornecedor(forn.id, { condicaoPagamento: e.target.value })}
+                          placeholder="Ex: 30 dias / Boleto / À vista"
+                          className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs outline-none focus:border-brand-500"
+                        />
+                      </div>
                     </div>
 
-                    <Button
-                      variant="success"
-                      size="sm"
-                      icon={<ShoppingCart className="w-3.5 h-3.5" />}
-                      onClick={() => handleConverterEmPedido(sup.id)}
-                    >
-                      Aprovar & Gerar Pedido de Compra
-                    </Button>
+                    {/* Bloco de Cálculo Automático e Ação */}
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 space-y-2.5">
+                      <div className={`p-3 rounded-xl border text-center transition-all ${
+                        isMelhorPreco
+                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
+                          : 'bg-slate-50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800'
+                      }`}>
+                        <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider block">
+                          Total Calculado (Valor × Qtd)
+                        </span>
+                        <span className={`font-mono font-black text-base block mt-0.5 ${
+                          isMelhorPreco ? 'text-emerald-400 dark:text-emerald-300' : 'text-slate-900 dark:text-white'
+                        }`}>
+                          {fmtMoeda(subtotal * 100)}
+                        </span>
+                        {isMelhorPreco && economiaReais > 0 && (
+                          <span className="text-[10px] text-emerald-400 font-bold block mt-0.5">
+                            Economia de {fmtMoeda(economiaReais * 100)}
+                          </span>
+                        )}
+                      </div>
+
+                      <Button
+                        variant={isMelhorPreco ? 'success' : 'primary'}
+                        size="sm"
+                        icon={<ShoppingCart className="w-3.5 h-3.5" />}
+                        className="w-full font-bold"
+                        onClick={() => handleConverterComparacaoEmPedido(forn)}
+                      >
+                        Aprovar & Gerar Pedido (PC)
+                      </Button>
+                    </div>
                   </div>
+                );
+              });
+            })()}
 
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="text-slate-400 border-b border-slate-200 dark:border-slate-800">
-                        <th className="py-2">Item / Insumo</th>
-                        <th className="py-2">Quantidade</th>
-                        <th className="py-2">Preço Unitário Cotado (R$)</th>
-                        <th className="py-2 text-right">Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200/50 dark:divide-slate-800/50">
-                      {cotItems.map(it => {
-                        const prod = db.products.find(p => p.id === it.productId);
-                        const precoUnit = mapaPrecos[sup.id]?.[it.productId]?.precoCents || 0;
-                        const subtotalCents = Math.round((precoUnit * it.quantidade) / 1000);
-                        totalFornecedor += subtotalCents;
-
-                        return (
-                          <tr key={it.id}>
-                            <td className="py-2">
-                              <span className="font-bold text-slate-900 dark:text-white">{prod?.descricao}</span>
-                              <span className="text-[10px] text-slate-400 block font-mono">[{prod?.codigo}]</span>
-                            </td>
-                            <td className="py-2 font-mono font-bold text-brand-600 dark:text-teal-400">
-                              {fmtQtd(it.quantidade, prod?.unidade || 'UN')}
-                            </td>
-                            <td className="py-2">
-                              <input
-                                type="number"
-                                step="0.01"
-                                placeholder="0,00"
-                                value={precoUnit ? precoUnit / 100 : ''}
-                                onChange={e => handlePrecoChange(sup.id, it.productId, parseFloat(e.target.value) || 0)}
-                                className="w-28 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-mono font-bold outline-none focus:border-brand-500"
-                              />
-                            </td>
-                            <td className="py-2 text-right font-mono font-extrabold text-emerald-600 dark:text-emerald-400">
-                              {fmtMoeda(subtotalCents)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t border-slate-200 dark:border-slate-800 font-bold">
-                        <td colSpan={3} className="pt-2 text-right text-slate-400 uppercase text-[10px]">Total Proposta Fornecedor:</td>
-                        <td className="pt-2 text-right font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
-                          {fmtMoeda(totalFornecedor)}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              );
-            })}
+            {/* Bloco Tracejado para Adicionar Fornecedor */}
+            <button
+              type="button"
+              onClick={handleAddFornecedor}
+              className="w-[220px] sm:w-[260px] flex-shrink-0 snap-center rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700/80 hover:border-brand-500 dark:hover:border-teal-400 p-6 flex flex-col items-center justify-center gap-3 text-slate-500 hover:text-brand-600 dark:hover:text-teal-400 transition-all group cursor-pointer"
+            >
+              <div className="p-3 rounded-full bg-slate-100 dark:bg-slate-800 group-hover:bg-brand-500/10 transition-colors">
+                <Plus className="w-6 h-6" />
+              </div>
+              <div className="text-center">
+                <span className="font-extrabold text-sm block">Adicionar Fornecedor</span>
+                <span className="text-[11px] text-slate-400 block mt-0.5">Incluir mais uma proposta para comparação lado a lado</span>
+              </div>
+            </button>
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
-            <Button variant="ghost" size="sm" onClick={() => setModalComparativoOpen(false)}>Fechar Mapa</Button>
+            <Button variant="ghost" size="sm" onClick={() => setModalComparativoOpen(false)}>
+              Fechar Comparador
+            </Button>
           </div>
         </div>
       </Modal>
