@@ -151,13 +151,25 @@ export const FichasTecnicas: React.FC = () => {
     alert('Componente adicionado à ficha técnica!');
   };
 
-  const handleRemoverComponente = async (bomItemId: string) => {
-    if (confirm('Deseja remover este componente da ficha técnica?')) {
-      await updateDb(prev => ({
-        ...prev,
-        bomItems: prev.bomItems.filter(i => i.id !== bomItemId)
-      }), 'BOM_ITEM_REMOVED');
-    }
+  const handleRemoverComponente = (bomItem: BOMItem) => {
+    const prod = db.products.find(p => p.id === bomItem.componentProductId);
+    requestDelete({
+      title: 'Remover Componente da Ficha Técnica',
+      itemName: `${prod?.descricao || 'Componente'} (Qtd: ${fmtQtd(bomItem.quantidade, prod?.unidade)})`,
+      itemType: 'Componente da BOM',
+      entityType: 'bomVersion',
+      moduleKey: 'producao',
+      originalId: bomItem.id,
+      itemData: bomItem,
+      isSoftDelete: true,
+      warningMessage: 'O componente será desvinculado desta versão da ficha técnica.',
+      onDelete: async () => {
+        await updateDb(prev => ({
+          ...prev,
+          bomItems: prev.bomItems.filter(i => i.id !== bomItem.id)
+        }), 'BOM_ITEM_REMOVED');
+      }
+    });
   };
 
   return (
@@ -236,7 +248,7 @@ export const FichasTecnicas: React.FC = () => {
                             <span className="text-[10px] text-slate-400 font-mono">Consumo: {fmtQtd(it.quantidade, comp?.unidade || 'UN')} {it.observacao && `(${it.observacao})`}</span>
                           </div>
                           <button
-                            onClick={() => handleRemoverComponente(it.id)}
+                            onClick={() => handleRemoverComponente(it)}
                             className="p-1 text-slate-400 hover:text-rose-500"
                             title="Remover Componente"
                           >

@@ -1,21 +1,34 @@
 import React, { useState } from 'react';
-import { ShoppingCart, FileSpreadsheet, CheckSquare, ListPlus } from 'lucide-react';
+import { ShoppingCart, FileSpreadsheet, CheckSquare, ListPlus, Zap } from 'lucide-react';
 import { Cotacoes } from './Cotacoes';
 import { PedidosCompra } from './PedidosCompra';
 import { ListaCompras } from './ListaCompras';
 import { Tarefas } from './Tarefas';
+import { CompraRapida } from './CompraRapida';
 
 interface ComprasProps {
-  defaultTab?: 'cotacoes' | 'pedidos' | 'lista' | 'tarefas';
+  defaultTab?: 'compra_rapida' | 'cotacoes' | 'pedidos' | 'lista' | 'tarefas';
 }
 
-export const Compras: React.FC<ComprasProps> = ({ defaultTab = 'cotacoes' }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'cotacoes' | 'pedidos' | 'lista' | 'tarefas'>(defaultTab);
+export const Compras: React.FC<ComprasProps> = ({ defaultTab = 'compra_rapida' }) => {
+  const [activeSubTab, setActiveSubTab] = useState<'compra_rapida' | 'cotacoes' | 'pedidos' | 'lista' | 'tarefas'>(defaultTab);
 
   return (
     <div className="space-y-4">
       {/* Navegação de Sub-abas de Compras */}
       <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 overflow-x-auto">
+        <button
+          onClick={() => setActiveSubTab('compra_rapida')}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+            activeSubTab === 'compra_rapida'
+              ? 'bg-teal-600 text-white shadow-sm ring-1 ring-teal-400/40'
+              : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Zap className="w-4 h-4 text-teal-300" />
+          <span>⚡ Compra Rápida</span>
+        </button>
+
         <button
           onClick={() => setActiveSubTab('cotacoes')}
           className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
@@ -49,7 +62,7 @@ export const Compras: React.FC<ComprasProps> = ({ defaultTab = 'cotacoes' }) => 
           }`}
         >
           <ListPlus className="w-4 h-4" />
-          <span>Lista de Compras & Cotações Rápidas</span>
+          <span>Lista de Compras & Suprimentos</span>
         </button>
 
         <button
@@ -67,6 +80,7 @@ export const Compras: React.FC<ComprasProps> = ({ defaultTab = 'cotacoes' }) => 
 
       {/* Conteúdo Dinâmico da Sub-Aba */}
       <div>
+        {activeSubTab === 'compra_rapida' && <CompraRapida onComplete={() => setActiveSubTab('cotacoes')} />}
         {activeSubTab === 'cotacoes' && <Cotacoes />}
         {activeSubTab === 'pedidos' && <PedidosCompra />}
         {activeSubTab === 'lista' && <ListaCompras />}

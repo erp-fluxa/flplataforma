@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { FileSpreadsheet, Plus, CheckCircle, Eye, ShoppingCart, Trash2, Edit, Power, PowerOff, Building, Sparkles, PackagePlus, Scale, Award, Clock, DollarSign, ArrowRight, UserCheck } from 'lucide-react';
+import { FileSpreadsheet, Plus, CheckCircle, Eye, ShoppingCart, Trash2, Edit, Power, PowerOff, Building, Sparkles, PackagePlus, Scale, Award, Clock, DollarSign, ArrowRight, UserCheck, Zap } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
 import { useDelete } from '../context/DeleteContext';
 import { Card, Button, Badge, Modal } from '../components/ui';
 import { fmtMoeda, fmtQtd, fmtData, uid } from '../lib/formatters';
 import { Quotation, QuotationItem, QuotationSupplierPrice, PurchaseOrder, Product, Supplier } from '../types';
+import { CompraRapida } from './CompraRapida';
 
 export interface FornecedorComparacao {
   id: string;
@@ -25,6 +26,7 @@ export const Cotacoes: React.FC = () => {
   const { requestDelete } = useDelete();
 
   // Modais
+  const [modalCompraRapidaOpen, setModalCompraRapidaOpen] = useState(false);
   const [modalNovaCotacaoOpen, setModalNovaCotacaoOpen] = useState(false);
   const [modalComparativoOpen, setModalComparativoOpen] = useState(false);
   const [modalViewOpen, setModalViewOpen] = useState(false);
@@ -96,6 +98,11 @@ export const Cotacoes: React.FC = () => {
     const codigoGerado = `${prefix}-NOVO-${String(seq).padStart(3, '0')}`;
     const newProdId = uid('prod');
 
+    // Confirmação Explícita Obrigatória
+    if (!confirm(`Deseja CADASTRAR DELIBERADAMENTE este novo produto no catálogo oficial do sistema?\n\nCódigo: ${codigoGerado}\nDescrição: ${manualDescricao.trim()}\nTipo: ${manualTipo === 'materia_prima' ? 'Matéria-Prima' : 'Uso e Consumo'}\n\nSe preferir usar um produto já existente, clique em Cancelar e selecione pelo Catálogo.`)) {
+      return;
+    }
+
     const novoProduto: Product = {
       id: newProdId,
       codigo: codigoGerado,
@@ -122,7 +129,7 @@ export const Cotacoes: React.FC = () => {
           action: 'PRODUCT_QUICK_REGISTERED',
           actor: { id: user?.id || 'admin', name: user?.name || 'Admin' },
           target: { tipo: 'PRODUTO', codigo: codigoGerado },
-          details: `Novo item "${manualDescricao}" pré-cadastrado via Cotação.`
+          details: `Novo item "${manualDescricao}" cadastrado deliberadamente via Cotação.`
         },
         ...(prev.auditLogs || [])
       ]
@@ -131,7 +138,7 @@ export const Cotacoes: React.FC = () => {
     // Adiciona na lista da cotação em andamento
     setItensCotacao(prev => [
       ...prev,
-      { productId: newProdId, quantidade: manualQtd * 1000, observacao: 'Item novo pré-cadastrado' }
+      { productId: newProdId, quantidade: manualQtd * 1000, observacao: 'Item novo cadastrado deliberadamente' }
     ]);
 
     // Reseta form manual
@@ -140,7 +147,7 @@ export const Cotacoes: React.FC = () => {
     setManualQtd(1);
     setItemMode('catalogo');
     setTempProdId(newProdId);
-    alert(`Item [${codigoGerado}] ${novoProduto.descricao} pré-cadastrado e adicionado à cotação!`);
+    alert(`Item [${codigoGerado}] ${novoProduto.descricao} cadastrado e adicionado à cotação!`);
   };
 
   const handleRemoveItemTemp = (idx: number) => {
@@ -460,6 +467,16 @@ export const Cotacoes: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <Button
+            variant="primary"
+            size="sm"
+            icon={<Zap className="w-3.5 h-3.5 text-teal-300" />}
+            onClick={() => setModalCompraRapidaOpen(true)}
+            className="bg-teal-600 hover:bg-teal-500 font-bold"
+          >
+            ⚡ Compra Rápida
+          </Button>
+
+          <Button
             variant="secondary"
             size="sm"
             icon={<Scale className="w-3.5 h-3.5 text-brand-600 dark:text-teal-400" />}
@@ -472,12 +489,12 @@ export const Cotacoes: React.FC = () => {
           </Button>
 
           <Button
-            variant="primary"
+            variant="secondary"
             size="sm"
             icon={<Plus className="w-3.5 h-3.5" />}
             onClick={handleOpenNew}
           >
-            Nova Cotação
+            Nova Cotação Completa
           </Button>
         </div>
       </div>
@@ -1075,6 +1092,16 @@ export const Cotacoes: React.FC = () => {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* MODAL: COMPRA RÁPIDA */}
+      <Modal
+        isOpen={modalCompraRapidaOpen}
+        onClose={() => setModalCompraRapidaOpen(false)}
+        title="⚡ Compra Rápida & Cotação Direta"
+        maxWidth="lg"
+      >
+        <CompraRapida onComplete={() => setModalCompraRapidaOpen(false)} />
       </Modal>
     </div>
   );
