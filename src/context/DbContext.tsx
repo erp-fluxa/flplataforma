@@ -35,8 +35,10 @@ interface DbContextType {
   excluirOpComEstorno: (opId: string, actorName: string) => Promise<{ success: boolean; error?: string; detalhes?: string }>;
   reconciliarEstoque: (actorName: string) => Promise<{ success: boolean; reservasRemovidas: number; detalhes?: string }>;
   salvarEmpresa: (company: Company, actorName: string) => Promise<{ success: boolean; error?: string }>;
-  excluirEmpresa: (companyId: string, actorName: string) => Promise<{ success: boolean; error?: string }>;
   selecionarEmpresaAtiva: (companyId: string) => Promise<void>;
+  connectionStatus: 'connected' | 'connecting' | 'syncing' | 'offline' | 'error';
+  connectionError: string | null;
+  reconnect: () => Promise<void>;
   salvarCategoria: (cat: MaterialCategory, actorName: string) => Promise<{ success: boolean; error?: string }>;
   excluirCategoria: (catId: string, actorName: string) => Promise<{ success: boolean; error?: string }>;
 }
@@ -127,6 +129,8 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'syncing' | 'offline' | 'error'>('connecting');
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const realtimeChannelRef = React.useRef<any>(null);
   const lastSyncTimestampRef = React.useRef<string>('');
 
@@ -134,6 +138,7 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     const sb = getSupabase();
     if (!sb) {
       setLoading(false);
+      setConnectionStatus('offline');
       return;
     }
 
@@ -145,31 +150,45 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         .order('criado_em', { ascending: false })
         .limit(1);
 
-      if (!error && Array.isArray(data) && data.length > 0 && data[0]?.dados) {
-        const cloudDb = data[0].dados;
-        const backupTimestamp = data[0].criado_em || new Date().toISOString();
+      if (error) {
+        setConnectionStatus('error');
+        setConnectionError(error.message);
+      } else {
+        setConnectionStatus('connected');
+        setConnectionError(null);
+        if (Array.isArray(data) && data.length > 0 && data[0]?.dados) {
+          const cloudDb = data[0].dados;
+          const backupTimestamp = data[0].criado_em || new Date().toISOString();
 
-        if (backupTimestamp !== lastSyncTimestampRef.current) {
-          lastSyncTimestampRef.current = backupTimestamp;
-          setDb(prev => {
-            const merged = deepMergeDbState(prev, cloudDb);
-            merged.lastBackup = backupTimestamp;
+          if (backupTimestamp !== lastSyncTimestampRef.current) {
+            lastSyncTimestampRef.current = backupTimestamp;
+            setDb(prev => {
+              const merged = deepMergeDbState(prev, cloudDb);
+              merged.lastBackup = backupTimestamp;
 
-            STORAGE_KEYS.forEach(key => {
-              safeLocalStorage.setItem(key, JSON.stringify(merged));
+              STORAGE_KEYS.forEach(key => {
+                safeLocalStorage.setItem(key, JSON.stringify(merged));
+              });
+
+              return merged;
             });
-
-            return merged;
-          });
+          }
         }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn('[Supabase Sync Error]', e);
+      setConnectionStatus('offline');
+      setConnectionError(e?.message || 'Falha de conexão / timeout');
     } finally {
       setSyncing(false);
       setLoading(false);
     }
   }, []);
+
+  const reconnect = useCallback(async () => {
+    setConnectionStatus('connecting');
+    await syncFromCloud();
+  }, [syncFromCloud]);
 
   const persistAndBroadcast = useCallback(async (newDb: DatabaseState, actionName: string = 'STATE_SYNC') => {
     const nowIso = new Date().toISOString();
@@ -195,13 +214,22 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     const sb = getSupabase();
     if (sb) {
       try {
-        await sb.from('system_backups').insert([{
+        const { error } = await sb.from('system_backups').insert([{
           versao: '2.0.0',
           dados: newDb,
           tipo: 'auto_sync'
         }]);
-      } catch (err) {
+        if (error) {
+          setConnectionStatus('error');
+          setConnectionError(error.message);
+        } else {
+          setConnectionStatus('connected');
+          setConnectionError(null);
+        }
+      } catch (err: any) {
         console.warn('[Supabase Insert Error]', err);
+        setConnectionStatus('offline');
+        setConnectionError(err?.message || 'Erro de rede na persistência');
       }
     }
   }, []);
@@ -1192,6 +1220,10 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         .subscribe((status: string) => {
           if (status === 'SUBSCRIBED') {
             realtimeChannelRef.current = channel;
+            setConnectionStatus('connected');
+            setConnectionError(null);
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn(`[Supabase Realtime: ${status}] Fallback para sincronização REST ativa.`);
           }
         });
     }
@@ -1203,16 +1235,24 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       if (!client) return;
 
       try {
-        const { data } = await client
+        const { data, error } = await client
           .from('system_backups')
           .select('criado_em')
           .order('criado_em', { ascending: false })
           .limit(1);
 
+        if (!error) {
+          setConnectionStatus('connected');
+          setConnectionError(null);
+        }
+
         if (data && data[0]?.criado_em && data[0].criado_em !== lastSyncTimestampRef.current) {
           syncFromCloud();
         }
-      } catch (_) {}
+      } catch (err: any) {
+        setConnectionStatus('offline');
+        setConnectionError(err?.message || 'Falha temporária de rede');
+      }
     }, 5000);
 
     return () => {
@@ -1230,6 +1270,9 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       db,
       loading,
       syncing,
+      connectionStatus,
+      connectionError,
+      reconnect,
       syncFromCloud,
       updateDb,
       uploadLogo,

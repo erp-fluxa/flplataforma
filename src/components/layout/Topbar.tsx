@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Bell, Building2, User as UserIcon, LogOut, Moon, Sun } from 'lucide-react';
+import { Menu, Bell, Building2, User as UserIcon, LogOut, Moon, Sun, Wifi, WifiOff, RefreshCw, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useDb } from '../../context/DbContext';
 import { Button } from '../ui';
@@ -12,7 +12,7 @@ interface TopbarProps {
 
 export const Topbar: React.FC<TopbarProps> = ({ onOpenMobileMenu, title, onNavigate }) => {
   const { user, logout } = useAuth();
-  const { db, selecionarEmpresaAtiva } = useDb();
+  const { db, selecionarEmpresaAtiva, connectionStatus, connectionError, syncing, reconnect } = useDb();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const isSuperAdmin = user?.roleId === 'super_admin' || user?.roleId === 'admin' || user?.role?.name?.toLowerCase().includes('admin') || user?.username === 'admin';
@@ -45,6 +45,33 @@ export const Topbar: React.FC<TopbarProps> = ({ onOpenMobileMenu, title, onNavig
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Indicador de Status da Conexão em Tempo Real */}
+        <div className="flex items-center">
+          {syncing ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-bold">
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              <span className="hidden sm:inline">Sincronizando</span>
+            </div>
+          ) : connectionStatus === 'connected' ? (
+            <div 
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold cursor-default"
+              title="Banco de dados Supabase Conectado e Sincronizado"
+            >
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="hidden sm:inline">Online</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => reconnect()}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[11px] font-bold hover:bg-rose-500/20 transition-colors"
+              title={`Offline (${connectionError || 'Falha de rede'}). Clique para reconectar.`}
+            >
+              <WifiOff className="w-3 h-3 text-rose-400" />
+              <span className="hidden sm:inline">Reconectar</span>
+            </button>
+          )}
+        </div>
+
         {/* Seletor de Unidade / Empresa */}
         {companiesList.length > 1 && (
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200">
