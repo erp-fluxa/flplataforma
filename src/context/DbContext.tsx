@@ -36,6 +36,8 @@ interface DbContextType {
   salvarEmpresa: (company: Company, actorName: string) => Promise<{ success: boolean; error?: string }>;
   excluirEmpresa: (companyId: string, actorName: string) => Promise<{ success: boolean; error?: string }>;
   selecionarEmpresaAtiva: (companyId: string) => Promise<void>;
+  salvarCategoria: (cat: MaterialCategory, actorName: string) => Promise<{ success: boolean; error?: string }>;
+  excluirCategoria: (catId: string, actorName: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const DbContext = createContext<DbContextType | null>(null);
@@ -388,6 +390,78 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         company: selected
       };
     }, 'COMPANY_CHANGED');
+  }, [updateDb]);
+
+  // SALVAR / CRIAR CATEGORIA DE MATERIAL/PRODUTO
+  const salvarCategoria = useCallback(async (cat: MaterialCategory, actorName: string): Promise<{ success: boolean; error?: string }> => {
+    if (!cat.nome || !cat.nome.trim()) {
+      return { success: false, error: 'O nome da categoria é obrigatório.' };
+    }
+
+    let result = { success: true, error: '' };
+    await updateDb(prev => {
+      const existing = (prev.materialCategories || []).find(c => c.id === cat.id);
+      const catFormatada: MaterialCategory = {
+        id: cat.id || uid('cat'),
+        nome: cat.nome.trim(),
+        tipo: cat.tipo || 'GERAL',
+        cor: cat.cor || 'teal',
+        ativo: cat.ativo !== false
+      };
+
+      const materialCategories = existing
+        ? (prev.materialCategories || []).map(c => c.id === cat.id ? catFormatada : c)
+        : [...(prev.materialCategories || []), catFormatada];
+
+      const auditLog = {
+        id: uid('log'),
+        timestamp: new Date().toISOString(),
+        action: existing ? 'CATEGORY_UPDATED' : 'CATEGORY_CREATED',
+        actor: { id: 'usr', name: actorName || 'Admin' },
+        target: { tipo: 'CATEGORIA_MATERIAL', codigo: catFormatada.nome },
+        details: `Categoria de material "${catFormatada.nome}" (${catFormatada.tipo}) ${existing ? 'atualizada' : 'criada'} por ${actorName || 'Admin'}.`
+      };
+
+      return {
+        ...prev,
+        materialCategories,
+        auditLogs: [auditLog, ...(prev.auditLogs || [])]
+      };
+    }, 'CATEGORY_SAVED');
+
+    return result;
+  }, [updateDb]);
+
+  // EXCLUIR CATEGORIA DE MATERIAL/PRODUTO
+  const excluirCategoria = useCallback(async (catId: string, actorName: string): Promise<{ success: boolean; error?: string }> => {
+    let result = { success: true, error: '' };
+    await updateDb(prev => {
+      const target = (prev.materialCategories || []).find(c => c.id === catId);
+      if (!target) {
+        result = { success: false, error: 'Categoria não encontrada.' };
+        return prev;
+      }
+
+      // Soft delete / remoção
+      const materialCategories = (prev.materialCategories || []).filter(c => c.id !== catId);
+
+      const auditLog = {
+        id: uid('log'),
+        timestamp: new Date().toISOString(),
+        action: 'CATEGORY_DELETED',
+        actor: { id: 'usr', name: actorName || 'Admin' },
+        target: { tipo: 'CATEGORIA_MATERIAL', codigo: target.nome },
+        details: `Categoria de material "${target.nome}" excluída por ${actorName || 'Admin'}.`
+      };
+
+      return {
+        ...prev,
+        materialCategories,
+        auditLogs: [auditLog, ...(prev.auditLogs || [])]
+      };
+    }, 'CATEGORY_DELETED');
+
+    return result;
   }, [updateDb]);
 
   // Upload de logotipos com versionamento
@@ -1188,7 +1262,9 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       reconciliarEstoque,
       salvarEmpresa,
       excluirEmpresa,
-      selecionarEmpresaAtiva
+      selecionarEmpresaAtiva,
+      salvarCategoria,
+      excluirCategoria
     }}>
       {children}
     </DbContext.Provider>

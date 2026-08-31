@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Users, Truck, Boxes, Layers, Cpu, Warehouse } from 'lucide-react';
+import { Users, Truck, Boxes, Layers, Cpu, Warehouse, Tag } from 'lucide-react';
 import { Clientes } from './Clientes';
 import { Fornecedores } from './Fornecedores';
 import { Estoque } from './Estoque';
 import { FichasTecnicas } from './FichasTecnicas';
 import { CentrosTrabalho } from './CentrosTrabalho';
 import { Depositos } from './Depositos';
+import { Categorias } from './Categorias';
 
-type CadTab = 'clientes' | 'fornecedores' | 'produtos' | 'fichas' | 'centros' | 'depositos';
+type CadTab = 'clientes' | 'fornecedores' | 'produtos' | 'categorias' | 'fichas' | 'centros' | 'depositos';
 
 interface CadastrosProps {
   defaultTab?: CadTab;
@@ -20,6 +21,7 @@ export const Cadastros: React.FC<CadastrosProps> = ({ defaultTab = 'clientes' })
     { id: 'clientes', label: 'Clientes', icon: <Users className="w-4 h-4" /> },
     { id: 'fornecedores', label: 'Fornecedores', icon: <Truck className="w-4 h-4" /> },
     { id: 'produtos', label: 'Produtos', icon: <Boxes className="w-4 h-4" /> },
+    { id: 'categorias', label: 'Categorias de Produtos', icon: <Tag className="w-4 h-4" /> },
     { id: 'fichas', label: 'Fichas Técnicas (BOM)', icon: <Layers className="w-4 h-4" /> },
     { id: 'centros', label: 'Centros de Trabalho', icon: <Cpu className="w-4 h-4" /> },
     { id: 'depositos', label: 'Depósitos', icon: <Warehouse className="w-4 h-4" /> }
@@ -53,6 +55,7 @@ export const Cadastros: React.FC<CadastrosProps> = ({ defaultTab = 'clientes' })
         {activeSubTab === 'clientes' && <Clientes />}
         {activeSubTab === 'fornecedores' && <Fornecedores />}
         {activeSubTab === 'produtos' && <Estoque />}
+        {activeSubTab === 'categorias' && <Categorias />}
         {activeSubTab === 'fichas' && <FichasTecnicas />}
         {activeSubTab === 'centros' && <CentrosTrabalho />}
         {activeSubTab === 'depositos' && <Depositos />}

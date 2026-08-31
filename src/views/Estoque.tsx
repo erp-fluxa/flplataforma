@@ -4,21 +4,26 @@ import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
 import { Button, Card, Badge, Modal } from '../components/ui';
 import { fmtMoeda, fmtQtd, fmtData, uid } from '../lib/formatters';
-import { Product } from '../types';
+import { Product, MaterialCategory } from '../types';
 
 export const Estoque: React.FC = () => {
-  const { db, updateDb, salvarProduto, excluirProduto, zerarSaldosEstoque, reconciliarEstoque } = useDb();
+  const { db, updateDb, salvarProduto, excluirProduto, zerarSaldosEstoque, reconciliarEstoque, salvarCategoria, excluirCategoria } = useDb();
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'mp' | 'muc' | 'pa' | 'separacao'>('mp');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('todas');
 
-  // Modais
+  // Modais de Produto
   const [modalProdutoOpen, setModalProdutoOpen] = useState(false);
   const [modalViewOpen, setModalViewOpen] = useState(false);
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+
+  // Modais de Categoria
+  const [modalCategoriasOpen, setModalCategoriasOpen] = useState(false);
+  const [editingCategoria, setEditingCategoria] = useState<Partial<MaterialCategory> | null>(null);
+  const [modalNovaCategoriaOpen, setModalNovaCategoriaOpen] = useState(false);
 
   // Modal Zeramento
   const [modalZerarOpen, setModalZerarOpen] = useState(false);
@@ -113,7 +118,60 @@ export const Estoque: React.FC = () => {
     alert('Todos os saldos de estoque foram zerados com sucesso!');
   };
 
-  const categories = Array.from(new Set(db.products.map(p => p.categoria).filter(Boolean))) as string[];
+  // Handlers de Categorias de Produtos
+  const handleOpenNewCategory = (tipoPadrao?: 'MP' | 'MUC' | 'PA' | 'GERAL') => {
+    setEditingCategoria({
+      id: '',
+      nome: '',
+      tipo: tipoPadrao || (activeTab === 'mp' ? 'MP' : (activeTab === 'muc' ? 'MUC' : 'PA')),
+      cor: 'teal',
+      ativo: true
+    });
+    setModalNovaCategoriaOpen(true);
+  };
+
+  const handleSaveCategoria = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategoria?.nome || !editingCategoria.nome.trim()) {
+      alert('O nome da categoria é obrigatório!');
+      return;
+    }
+
+    const res = await salvarCategoria(editingCategoria as MaterialCategory, user?.name || 'Admin');
+    if (res.success) {
+      if (editingProduct) {
+        setEditingProduct(prev => ({ ...prev, categoria: editingCategoria.nome?.trim() }));
+      }
+      setModalNovaCategoriaOpen(false);
+      setEditingCategoria(null);
+      alert('Categoria salva com sucesso!');
+    } else {
+      alert(res.error || 'Erro ao salvar categoria.');
+    }
+  };
+
+  const handleDeleteCategoria = async (cat: MaterialCategory) => {
+    const vinculados = db.products.filter(p => p.categoria === cat.nome).length;
+    let aviso = '';
+    if (vinculados > 0) {
+      aviso = `\n\n⚠️ Existem ${vinculados} produto(s) vinculados a esta categoria.`;
+    }
+    if (confirm(`Deseja realmente excluir a categoria "${cat.nome}"?${aviso}`)) {
+      const res = await excluirCategoria(cat.id, user?.name || 'Admin');
+      if (res.success) {
+        alert('Categoria excluída com sucesso!');
+      } else {
+        alert(res.error || 'Erro ao excluir categoria.');
+      }
+    }
+  };
+
+  // Lista unificada de categorias
+  const registeredCategories = db.materialCategories || [];
+  const categories = Array.from(new Set([
+    ...registeredCategories.map(c => c.nome),
+    ...db.products.map(p => p.categoria).filter(Boolean)
+  ])) as string[];
 
   return (
     <div className="space-y-5">
@@ -141,6 +199,15 @@ export const Estoque: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Tag className="w-3.5 h-3.5 text-brand-600 dark:text-teal-400" />}
+            onClick={() => setModalCategoriasOpen(true)}
+          >
+            Categorias ({registeredCategories.length})
+          </Button>
+
           <Button
             variant="secondary"
             size="sm"
@@ -516,20 +583,190 @@ export const Estoque: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
-              <input
-                type="text"
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-bold text-slate-700 dark:text-slate-300">Categoria</label>
+                <button
+                  type="button"
+                  onClick={() => handleOpenNewCategory()}
+                  className="text-[10.5px] font-bold text-brand-600 dark:text-teal-400 hover:underline"
+                >
+                  + Nova Categoria
+                </button>
+              </div>
+              <select
                 value={editingProduct?.categoria || ''}
                 onChange={e => setEditingProduct(prev => ({ ...prev, categoria: e.target.value }))}
-                placeholder="Ex: Perfis, Motores, etc."
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs outline-none focus:border-brand-500"
-              />
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs outline-none focus:border-brand-500 font-medium"
+              >
+                <option value="">Selecione a categoria...</option>
+                {categories.map(catNome => (
+                  <option key={catNome} value={catNome}>
+                    {catNome}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
             <Button variant="ghost" size="sm" type="button" onClick={() => setModalProdutoOpen(false)}>Cancelar</Button>
             <Button variant="primary" size="sm" type="submit">Salvar Item</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL: GERENCIAMENTO DE CATEGORIAS */}
+      <Modal
+        isOpen={modalCategoriasOpen}
+        onClose={() => setModalCategoriasOpen(false)}
+        title="Gestão de Categorias de Materiais & Produtos"
+        maxWidth="lg"
+      >
+        <div className="space-y-4 text-xs">
+          <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
+            <div>
+              <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">Categorias Cadastradas</h4>
+              <p className="text-slate-500 text-[11px]">Gerencie as categorias de Matéria-Prima, Consumo e Produtos Acabados.</p>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Plus className="w-3.5 h-3.5" />}
+              onClick={() => handleOpenNewCategory()}
+            >
+              + Nova Categoria
+            </Button>
+          </div>
+
+          {/* Tabela de Categorias */}
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 font-bold text-slate-500">
+                <tr>
+                  <th className="px-4 py-2.5">Nome da Categoria</th>
+                  <th className="px-4 py-2.5">Tipo Aplicável</th>
+                  <th className="px-4 py-2.5">Produtos Vinculados</th>
+                  <th className="px-4 py-2.5 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                {(registeredCategories.length > 0 ? registeredCategories : [
+                  { id: 'cat-fil', nome: 'Filamento', tipo: 'MP', ativo: true },
+                  { id: 'cat-mec', nome: 'Mecânica', tipo: 'MP', ativo: true },
+                  { id: 'cat-elet', nome: 'Eletrônica', tipo: 'MP', ativo: true }
+                ] as MaterialCategory[]).map(cat => {
+                  const vinculados = db.products.filter(p => p.categoria === cat.nome).length;
+
+                  return (
+                    <tr key={cat.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                      <td className="px-4 py-2.5 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Tag className="w-3.5 h-3.5 text-brand-600 dark:text-teal-400" />
+                        <span>{cat.nome}</span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <Badge variant={cat.tipo === 'MP' ? 'info' : (cat.tipo === 'PA' ? 'success' : (cat.tipo === 'MUC' ? 'warning' : 'neutral'))}>
+                          {cat.tipo === 'MP' ? 'Matéria-Prima (MP)' : (cat.tipo === 'PA' ? 'Produto Acabado (PA)' : (cat.tipo === 'MUC' ? 'Uso/Consumo (MUC)' : 'Geral'))}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-500">
+                        {vinculados} item(ns)
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingCategoria({ ...cat });
+                              setModalNovaCategoriaOpen(true);
+                            }}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-slate-800 transition-colors"
+                            title="Editar Categoria"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCategoria(cat)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                            title="Excluir Categoria"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+            <Button variant="ghost" size="sm" onClick={() => setModalCategoriasOpen(false)}>Fechar</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* MODAL: ADICIONAR / EDITAR CATEGORIA */}
+      <Modal
+        isOpen={modalNovaCategoriaOpen}
+        onClose={() => { setModalNovaCategoriaOpen(false); setEditingCategoria(null); }}
+        title={editingCategoria?.id ? 'Editar Categoria' : 'Nova Categoria de Material / Produto'}
+      >
+        <form onSubmit={handleSaveCategoria} className="space-y-4 text-xs">
+          <div>
+            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Nome da Categoria *</label>
+            <input
+              type="text"
+              value={editingCategoria?.nome || ''}
+              onChange={e => setEditingCategoria(prev => ({ ...prev, nome: e.target.value }))}
+              placeholder="Ex: Motores & Drivers, Chapas Metálicas, etc."
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs outline-none focus:border-brand-500"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Tipo de Aplicação</label>
+              <select
+                value={editingCategoria?.tipo || 'MP'}
+                onChange={e => setEditingCategoria(prev => ({ ...prev, tipo: e.target.value as any }))}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs outline-none focus:border-brand-500"
+              >
+                <option value="MP">Matéria-Prima (MP)</option>
+                <option value="MUC">Uso e Consumo (MUC)</option>
+                <option value="PA">Produto Acabado (PA)</option>
+                <option value="GERAL">Geral / Todos</option>
+              </select>
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Cor da Tag / Destaque</label>
+              <select
+                value={editingCategoria?.cor || 'teal'}
+                onChange={e => setEditingCategoria(prev => ({ ...prev, cor: e.target.value }))}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs outline-none focus:border-brand-500"
+              >
+                <option value="teal">Verde / Ciano (Teal)</option>
+                <option value="blue">Azul (Blue)</option>
+                <option value="amber">Amarelo / Âmbar (Amber)</option>
+                <option value="purple">Roxo / Púrpura (Purple)</option>
+                <option value="rose">Rosa / Vermelho (Rose)</option>
+                <option value="slate">Cinza Neutro (Slate)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              onClick={() => { setModalNovaCategoriaOpen(false); setEditingCategoria(null); }}
+            >
+              Cancelar
+            </Button>
+            <Button variant="primary" size="sm" type="submit">
+              Salvar Categoria
+            </Button>
           </div>
         </form>
       </Modal>
