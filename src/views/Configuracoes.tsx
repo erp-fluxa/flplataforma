@@ -105,6 +105,29 @@ export const Configuracoes: React.FC = () => {
     }), 'USER_STATUS_TOGGLED');
   };
 
+  const handleDeleteUser = async (userId: string) => {
+    if (!isSuperAdmin) {
+      alert('Apenas o Super Admin tem permissão para excluir usuários.');
+      return;
+    }
+
+    if (userId === 'usr-admin' || userId === 'usr-joao-marcos') {
+      alert('Não é permitido excluir os usuários administradores padrão do sistema.');
+      return;
+    }
+
+    const target = db.users.find(u => u.id === userId);
+    const userName = target?.name || target?.username || 'Usuário';
+
+    if (confirm(`Tem certeza que deseja excluir o usuário "${userName}" (@${target?.username || ''})?\n\nEsta ação removerá o acesso do usuário do sistema.`)) {
+      await updateDb(prev => ({
+        ...prev,
+        users: (prev.users || []).filter(u => u.id !== userId)
+      }), 'USER_DELETED');
+      alert(`Usuário ${userName} excluído com sucesso!`);
+    }
+  };
+
   const handleOpenEditUser = (userToEdit: User) => {
     setEditingUser({ ...userToEdit });
     setModalUserOpen(true);
@@ -122,6 +145,7 @@ export const Configuracoes: React.FC = () => {
     });
     setModalUserOpen(true);
   };
+
 
   // Funções Multi-Empresa
   const handleOpenNewEmpresa = () => {
