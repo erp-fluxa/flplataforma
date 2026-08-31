@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Trash2, RotateCcw, Search, Filter, AlertTriangle, ShieldCheck, 
   Calendar, User, Clock, CheckCircle2, Package, Users, ShoppingBag, 
-  Wrench, ShoppingCart, FileSpreadsheet, Building2, Tag, Layers, Database
+  Wrench, ShoppingCart, FileSpreadsheet, Building2, Tag, Layers, Database, CheckSquare
 } from 'lucide-react';
 import { useDelete } from '../context/DeleteContext';
 import { useAuth } from '../context/AuthContext';
@@ -56,6 +56,7 @@ export const Lixeira: React.FC = () => {
       case 'quotation': return <FileSpreadsheet className="w-4 h-4 text-blue-400" />;
       case 'purchaseOrder': return <ShoppingCart className="w-4 h-4 text-teal-400" />;
       case 'shoppingItem': return <ShoppingCart className="w-4 h-4 text-amber-400" />;
+      case 'task': return <CheckSquare className="w-4 h-4 text-emerald-400" />;
       case 'workCenter': return <Wrench className="w-4 h-4 text-purple-400" />;
       case 'warehouse': return <Database className="w-4 h-4 text-blue-400" />;
       case 'bomVersion': return <Layers className="w-4 h-4 text-teal-400" />;
@@ -77,6 +78,7 @@ export const Lixeira: React.FC = () => {
       quotation: 'Cotação / RFQ',
       purchaseOrder: 'Pedido de Compra',
       shoppingItem: 'Item Lista de Compras',
+      task: 'Tarefa Operacional',
       workCenter: 'Centro de Trabalho',
       warehouse: 'Depósito / Almoxarifado',
       bomVersion: 'Ficha Técnica (BOM)'

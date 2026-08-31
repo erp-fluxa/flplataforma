@@ -265,6 +265,14 @@ export const DeleteProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             : [restoredShop, ...(prev.gescompShoppingList || [])];
           break;
 
+        case 'task':
+          const restoredTask = { ...itemData, completed: false };
+          const existingTaskIdx = (prev.gescompTasks || []).findIndex(t => t.id === record.originalId);
+          nextDb.gescompTasks = existingTaskIdx >= 0
+            ? prev.gescompTasks.map(t => t.id === record.originalId ? restoredTask : t)
+            : [restoredTask, ...(prev.gescompTasks || [])];
+          break;
+
         case 'workCenter':
           const restoredWc = { ...itemData, ativo: true };
           const existingWcIdx = (prev.workCenters || []).findIndex(w => w.id === record.originalId);

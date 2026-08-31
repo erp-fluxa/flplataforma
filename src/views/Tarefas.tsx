@@ -54,10 +54,10 @@ export const Tarefas: React.FC = () => {
 
   const handleDeleteTask = (task: FluxaTask) => {
     requestDelete({
-      title: 'Excluir Tarefa',
+      title: 'Excluir Tarefa Operacional',
       itemName: task.text,
       itemType: 'Tarefa',
-      entityType: 'shoppingItem',
+      entityType: 'task',
       moduleKey: 'tarefas',
       originalId: task.id,
       itemData: task,

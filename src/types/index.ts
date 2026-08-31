@@ -398,7 +398,7 @@ export interface CustomLogos {
 export interface DeletedItemRecord {
   id: string;
   originalId: string;
-  entityType: 'product' | 'category' | 'company' | 'user' | 'customer' | 'supplier' | 'salesOrder' | 'productionOrder' | 'quotation' | 'purchaseOrder' | 'shoppingItem' | 'workCenter' | 'warehouse' | 'bomVersion';
+  entityType: 'product' | 'category' | 'company' | 'user' | 'customer' | 'supplier' | 'salesOrder' | 'productionOrder' | 'quotation' | 'purchaseOrder' | 'shoppingItem' | 'task' | 'workCenter' | 'warehouse' | 'bomVersion';
   entityName: string;
   entityCode?: string;
   data: any;

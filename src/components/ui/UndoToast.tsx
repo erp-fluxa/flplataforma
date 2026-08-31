@@ -39,7 +39,7 @@ export const UndoToast: React.FC<UndoToastProps> = ({
   if (!deletedItem) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 max-w-sm w-full animate-in slide-in-from-bottom-5 duration-200">
+    <div className="fixed bottom-5 left-4 right-4 sm:left-auto sm:right-5 z-[9999] max-w-sm sm:w-full animate-in slide-in-from-bottom-5 duration-200">
       <div className="bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700/80 p-3.5 overflow-hidden relative">
         {/* Barra de Progresso do Tempo Restante */}
         <div 
