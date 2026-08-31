@@ -2,23 +2,17 @@
 module.exports = {
   darkMode: 'class',
   content: [
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/**/*.{js,ts,jsx,tsx,mdx}',
-    './lib/**/*.{js,ts,jsx,tsx,mdx}',
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
-      fontFamily: {
-        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-mono)', 'monospace'],
-      },
       colors: {
         brand: {
           50: '#f0fdfa',
           100: '#ccfbf1',
           200: '#99f6e4',
+          300: '#5eead4',
           400: '#2dd4bf',
           500: '#14b8a6',
           600: '#0d9488',
@@ -27,7 +21,17 @@ module.exports = {
           900: '#134e4a',
           950: '#042f2e',
         },
+        dark: {
+          bg: '#070D1F',
+          card: '#111A2D',
+          border: '#1E293B',
+          inner: '#05091A',
+        }
       },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      }
     },
   },
   plugins: [],

@@ -1,126 +1,62 @@
-// src/types/index.ts — Tipagens TypeScript do Sistema ERP Cotalis JP3D
-
-export type PermissionKey =
-  // Compras & Cotações
-  | 'compras.requisicoes.ver'
-  | 'compras.requisicoes.criar'
-  | 'compras.requisicoes.editar'
-  | 'compras.requisicoes.excluir'
-  | 'compras.requisicoes.aprovar'
-  | 'compras.cotacoes.ver'
-  | 'compras.cotacoes.criar'
-  | 'compras.cotacoes.editar'
-  | 'compras.cotacoes.excluir'
-  | 'compras.cotacoes.aprovar'
-  | 'compras.cotacoes.converter_pedido'
-  | 'compras.cotacoes.bloquear'
-  | 'compras.pedidos.ver'
-  | 'compras.pedidos.criar'
-  | 'compras.pedidos.receber'
-  | 'compras.pedidos.cancelar'
-  | 'compras.fornecedores.ver'
-  | 'compras.fornecedores.gerenciar'
-  | 'compras.produtos.ver'
-  | 'compras.produtos.gerenciar'
-  // Vendas
-  | 'vendas.pedidos.ver'
-  | 'vendas.pedidos.criar'
-  | 'vendas.pedidos.editar'
-  | 'vendas.pedidos.confirmar'
-  | 'vendas.pedidos.cancelar'
-  | 'vendas.pedidos.faturar'
-  // Produção & Fichas
-  | 'producao.ordens.ver'
-  | 'producao.ordens.criar'
-  | 'producao.ordens.editar'
-  | 'producao.ordens.liberar'
-  | 'producao.ordens.apontar'
-  | 'producao.ordens.concluir'
-  | 'producao.ordens.cancelar'
-  | 'producao.fichas.ver'
-  | 'producao.fichas.criar'
-  | 'producao.fichas.editar'
-  | 'producao.fichas.ativar'
-  | 'producao.fichas.excluir'
-  | 'producao.apontamento.apontar'
-  | 'producao.apontamento.refugar'
-  | 'producao.apontamento.pausar'
-  // Estoque, Separação & Alertas
-  | 'estoque.materiaprima.ver'
-  | 'estoque.materiaprima.gerenciar'
-  | 'estoque.materiaprima.importar'
-  | 'estoque.modelos.ver'
-  | 'estoque.modelos.gerenciar'
-  | 'estoque.separacao.ver'
-  | 'estoque.separacao.executar'
-  | 'estoque.separacao.cancelar'
-  | 'estoque.movimentacoes.ver'
-  | 'estoque.movimentacoes.criar'
-  | 'estoque.movimentacoes.estornar'
-  | 'estoque.movimentacoes.permitir_negativo'
-  | 'estoque.inventario.ver'
-  | 'estoque.inventario.criar'
-  | 'estoque.inventario.aprovar_ajuste'
-  | 'estoque.alertas.ver'
-  | 'estoque.alertas.receber'
-  | 'estoque.alertas.reconhecer'
-  | 'estoque.alertas.silenciar'
-  | 'estoque.alertas.configurar'
-  // Suporte & Pós-Venda
-  | 'suporte.tickets.ver'
-  | 'suporte.tickets.criar'
-  | 'suporte.tickets.editar'
-  | 'suporte.tickets.atribuir'
-  | 'suporte.tickets.responder'
-  | 'suporte.tickets.resolver'
-  | 'suporte.tickets.fechar'
-  | 'suporte.pecas.solicitar'
-  | 'suporte.pecas.aprovar_cobranca'
-  // Configurações
-  | 'config.usuarios.ver'
-  | 'config.usuarios.gerenciar'
-  | 'config.funcoes.ver'
-  | 'config.funcoes.gerenciar'
-  | 'config.empresa.ver'
-  | 'config.empresa.editar'
-  | 'config.auditoria.ver'
-  | 'config.producao.ver'
-  | 'config.producao.editar'
-  | 'config.suporte.ver'
-  | 'config.suporte.editar';
+export type ItemType = 'materia_prima' | 'muc' | 'produto_acabado' | 'insumo';
 
 export interface UserPreferences {
   sidebarCollapsed?: boolean;
   theme?: 'dark' | 'light';
-  viewModeCotacoes?: 'kanban' | 'lista';
-  notificacoesWhatsapp?: boolean;
-  notificacoesEmail?: boolean;
+  notificationsSound?: boolean;
+}
+
+export interface UserRole {
+  id: string;
+  name: string;
 }
 
 export interface User {
   id: string;
   name: string;
+  username: string;
   email: string;
+  password?: string;
   roleId: string;
+  role?: UserRole;
+  permissoes?: string[];
   active: boolean;
   preferences?: UserPreferences;
-  createdAt: string;
+  createdAt?: string;
+  created_at?: string;
 }
 
-export interface Role {
+export interface Company {
   id: string;
-  name: string;
-  description: string;
-  approvalLimitCents: number | null; // null = ilimitado, 0 = sem alçada
-  permissions: PermissionKey[];
+  nome: string;
+  razaoSocial?: string;
+  nomeFantasia?: string;
+  fantasia?: string;
+  cnpj: string;
+  inscricaoEstadual?: string;
+  endereco?: string;
+  cidade?: string;
+  uf?: string;
+  telefone?: string;
+  email?: string;
+  regimeTributario?: string;
+  logo_url?: string;
+  logo_sidebar_url?: string;
+  logo_plataforma_url?: string;
+  logo_icone_url?: string;
+  logo_texto_url?: string;
+  logo_institucional_url?: string;
+  isMatriz?: boolean;
+  ativa?: boolean;
+  active?: boolean;
 }
 
 export interface MaterialCategory {
   id: string;
   nome: string;
-  tipo: 'MP' | 'MUC';
-  descricao?: string;
-  sistema?: boolean;
+  tipo: 'MP' | 'MUC' | 'PA' | 'GERAL';
+  cor?: string;
+  ativo: boolean;
 }
 
 export interface Product {
@@ -129,132 +65,92 @@ export interface Product {
   descricao: string;
   unidade: string;
   categoria?: string;
-  tipo: 'PA' | 'MP' | 'MUC' | 'materia_prima' | 'componente' | 'produto_acabado' | 'servico';
-  precoReferencia?: number; // Centavos
-  custoMedioCents?: number; // Centavos
-  estoqueMinimo?: number; // Milésimos
-  estoqueMaximo?: number; // Milésimos
-  pontoReposicao?: number; // Milésimos
-  loteEconomico?: number; // Milésimos
-  leadTimeCompraDias?: number;
-  fornecedorId?: string;
-  localizacao?: string;
-  controlaLote?: boolean;
-  controlaSerie?: boolean;
-  produzivel?: boolean;
-  sobEncomenda?: boolean;
-  linha?: 'CV' | 'CX';
-  volumeXy?: string;
-  eixoZ?: string;
-  sinalEntradaCents?: number;
-  destaqueComercial?: string;
-  prazoFabricacaoDias?: number;
-  alertaEstoqueAtivo?: boolean;
-  alertaResponsavelId?: string;
-  consumoMedioDiario?: number; // Milésimos
+  categoriaId?: string;
+  tipo?: 'MP' | 'MUC' | 'PA' | string;
+  tipo_item?: ItemType | string;
+  tipoItem?: string;
+  linha?: string;
+  areaUtil?: string;
+  volumeConstrucao?: string;
+  cinematica?: string;
+  hotend?: string;
+  eletronica?: string;
+  potenciaNominal?: string;
+  pesoKg?: number;
+  dimensoes?: string;
+  estoqueMinimo: number;
+  pontoReposicao?: number;
+  custoMedioCents?: number;
+  precoReferencia?: number;
+  precoVendaCents?: number;
+  ativo: boolean;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  version?: number;
+  createdAt?: string;
 }
 
-// Alertas de Estoque (Parte 6)
-export interface StockAlert {
+export interface Warehouse {
   id: string;
-  productId: string;
-  nivel: 'atencao' | 'critico' | 'zerado';
-  disponivelNoDisparo: number; // Milésimos
-  estoqueMinimoNoDisparo: number;
-  pontoReposicaoNoDisparo: number;
-  origemTipo: 'movimentacao' | 'reserva' | 'inventario' | 'varredura_diaria' | 'manual';
-  origemId?: string;
-  status: 'aberto' | 'reconhecido' | 'em_reposicao' | 'resolvido' | 'silenciado';
-  reconhecidoPor?: string;
-  reconhecidoEm?: string;
-  silenciadoAte?: string;
-  requisitionId?: string;
-  productionOrderId?: string;
-  resolvidoEm?: string;
-  resolvidoPorque?: 'reposicao' | 'ajuste_minimo' | 'cancelado' | 'manual';
-  criadoEm: string;
-  atualizadoEm: string;
-}
-
-export interface StockAlertEvent {
-  id: string;
-  alertId: string;
-  tipo: 'aberto' | 'escalou' | 'reduziu' | 'reconhecido' | 'silenciado' | 'requisicao_criada' | 'op_criada' | 'resolvido' | 'reaberto';
-  nivelAnterior?: string;
-  nivelNovo?: string;
-  disponivel: number;
-  userId?: string;
-  detalhes?: any;
-  criadoEm: string;
-}
-
-export interface NotificationItem {
-  id: string;
-  userId?: string;
-  tipo: 'alerta_estoque' | 'op_liberada' | 'sla_alerta' | 'geral';
-  titulo: string;
-  mensagem: string;
-  documentoTipo?: string;
-  documentoId?: string;
-  lidaEm?: string;
-  criadoEm: string;
-}
-
-// Vendas
-export interface Customer {
-  id: string;
+  codigo: string;
   nome: string;
-  cnpjCpf?: string;
-  contatoNome?: string;
-  email?: string;
-  telefone?: string;
-  cidade?: string;
-  uf?: string;
-  endereco?: string;
-  observacoes?: string;
-  ativo?: boolean;
+  tipo: 'central' | 'materia_prima' | 'produto_acabado' | 'consumo' | 'quarentena' | 'terceiros' | 'refugo' | string;
+  companyId?: string;
+  ativo: boolean;
 }
 
-export interface SalesOrder {
+export interface WarehouseLocation {
   id: string;
-  numero: string;
-  customerId: string;
-  vendedorId?: string;
-  condicaoPagamento?: string;
-  formaPagamento?: string;
-  prazoEntrega?: string;
-  dataEntregaPrometida?: string;
-  frete?: number; // Centavos
-  desconto?: number; // Centavos
-  status: 'orcamento' | 'confirmado' | 'em_producao' | 'parcial' | 'pronto_expedicao' | 'faturado' | 'entregue' | 'cancelado';
-  observacoes?: string;
+  warehouseId: string;
+  codigo: string;
+  descricao?: string;
+  ativo: boolean;
+}
+
+export interface StockBalance {
+  id: string;
+  productId: string;
+  warehouseId: string;
+  companyId?: string;
+  locationId?: string | null;
+  quantidade: number; // in milli-units (e.g. 1000 = 1.000)
+  custoMedio?: number; // in cents
+}
+
+export interface StockMovement {
+  id: string;
+  productId: string;
+  warehouseId: string;
+  companyId?: string;
+  tipo: 'entrada' | 'saida' | 'saldo_inicial' | 'ajuste_inventario' | 'producao' | 'separacao' | string;
+  quantidade: number;
+  sinal: number; // 1 or -1
+  custoUnitario?: number;
+  origemTipo?: string;
+  origemId?: string;
+  observacao?: string;
+  criadoEm?: string;
+  criadoPor?: string;
+}
+
+export interface StockReservation {
+  id: string;
+  productId: string;
+  warehouseId: string;
+  productionOrderId?: string;
+  salesOrderId?: string;
+  quantidade: number;
+  status: 'ativa' | 'consumida' | 'cancelada';
   criadoEm: string;
 }
 
-export interface SalesOrderItem {
-  id: string;
-  salesOrderId: string;
-  productId: string;
-  descricao: string;
-  unidade: string;
-  quantidade: number; // Milésimos
-  precoUnitario: number; // Centavos
-  modeloMaquina?: string;
-  bomVersionId?: string;
-  configuracao?: string;
-  quantidadeProduzida?: number;
-  quantidadeEntregue?: number;
-}
-
-// Ficha Técnica (BOM)
 export interface BOMVersion {
   id: string;
   productId: string;
   versao: string;
   descricao?: string;
-  status: 'rascunho' | 'ativa' | 'obsoleta';
-  vigenteDe?: string;
-  vigenteAte?: string;
+  status: 'ativa' | 'em_revisao' | 'obsoleta';
+  vigenteDe: string;
   criadoEm: string;
 }
 
@@ -262,166 +158,219 @@ export interface BOMItem {
   id: string;
   bomVersionId: string;
   componentProductId: string;
-  quantidade: number; // Milésimos
+  quantidade: number; // milli-units
   perdaPercentual?: number;
-  operacaoId?: string;
   opcional?: boolean;
   observacao?: string;
 }
 
 export interface WorkCenter {
   id: string;
+  codigo: string;
   nome: string;
-  tipo: 'maquina' | 'bancada' | 'celula' | 'externo';
-  capacidadeHoraDia?: number;
-  custoHora?: number; // Centavos
-  ativo?: boolean;
+  tipo: string;
+  capacidadeHora?: number;
+  custoHoraCents?: number;
+  ativo: boolean;
 }
 
-export interface RoutingOperation {
-  id: string;
-  bomVersionId: string;
-  sequencia: number;
-  nome: string;
-  workCenterId?: string;
-  tempoSetupMin?: number;
-  tempoUnitarioMin?: number;
-  instrucoes?: string;
-}
-
-// Produção
 export interface ProductionOrder {
   id: string;
-  numero: string;
-  salesOrderId?: string;
-  salesOrderItemId?: string;
+  codigo: string;
   productId: string;
-  modeloMaquina?: string;
-  bomVersionId?: string;
-  quantidade: number; // Milésimos
-  quantidadeProduzida?: number;
-  quantidadeRefugo?: number;
-  prioridade: 'baixa' | 'normal' | 'alta' | 'urgente';
-  dataPrevistaInicio?: string;
-  dataPrevistaFim?: string;
+  bomVersionId: string;
+  salesOrderId?: string;
+  salesOrderCodigo?: string;
+  quantidadePlanejada: number;
+  quantidadeProduzida: number;
+  quantidadeRefugo: number;
+  status: 'planejada' | 'aguardando_material' | 'material_reservado' | 'separacao_pendente' | 'liberada' | 'em_producao' | 'pausada' | 'concluida' | 'cancelada';
+  dataInicioPrevista: string;
+  dataEntregaPrevista: string;
   dataInicioReal?: string;
   dataFimReal?: string;
-  status: 'planejada' | 'aguardando_material' | 'material_reservado' | 'separacao_pendente' | 'liberada' | 'em_producao' | 'pausada' | 'concluida' | 'cancelada';
-  tipo: 'normal' | 'retrabalho' | 'estoque';
-  ticketId?: string;
-  posicaoKanban?: number;
-  responsavelId?: string;
-  observacoes?: string;
+  companyId?: string;
   criadoEm: string;
-}
-
-export interface ProductionOrderMaterial {
-  id: string;
-  productionOrderId: string;
-  componentProductId: string;
-  quantidadeNecessaria: number; // Milésimos
-  quantidadeReservada: number;
-  quantidadeSeparada: number;
-  quantidadeConsumida: number;
-  quantidadeDevolvida: number;
-  faltaQuantidade: number;
-  requisitionId?: string;
 }
 
 export interface PickingOrder {
   id: string;
-  numero: string;
-  productionOrderId: string;
-  status: 'aberta' | 'em_separacao' | 'separada' | 'parcial' | 'cancelada';
-  responsavelId?: string;
-  iniciadoEm?: string;
-  concluidoEm?: string;
-  observacoes?: string;
-}
-
-export interface PickingItem {
-  id: string;
-  pickingOrderId: string;
-  productionOrderMaterialId: string;
-  componentProductId: string;
-  warehouseId: string;
-  locationId?: string;
-  quantidadeSolicitada: number; // Milésimos
-  quantidadeSeparada: number;
-  loteId?: string;
-  status: 'pendente' | 'separado' | 'falta' | 'substituido';
-  observacao?: string;
-}
-
-// Suporte
-export interface Ticket {
-  id: string;
-  numero: string;
-  titulo: string;
-  descricao?: string;
-  customerId?: string;
-  salesOrderId?: string;
-  productionOrderId?: string;
-  productId?: string;
-  numeroSerie?: string;
-  categoria: 'duvida' | 'defeito' | 'instalacao' | 'manutencao' | 'garantia' | 'pedido_peca' | 'melhoria' | 'outro';
-  canal: 'telefone' | 'email' | 'whatsapp' | 'presencial' | 'portal';
-  prioridade: 'baixa' | 'normal' | 'alta' | 'critica';
-  status: 'novo' | 'em_triagem' | 'em_atendimento' | 'aguardando_cliente' | 'aguardando_peca' | 'em_campo' | 'resolvido' | 'fechado' | 'cancelado';
-  responsavelId?: string;
-  solicitanteNome?: string;
-  solicitanteContato?: string;
-  slaPrimeiraRespostaAte?: string;
-  slaResolucaoAte?: string;
-  primeiraRespostaEm?: string;
-  resolvidoEm?: string;
-  fechadoEm?: string;
-  emGarantia?: boolean;
-  posicaoKanban?: number;
+  codigo: string;
+  tipo: 'OP' | 'PV' | 'TRANSFERENCIA';
+  referenciaId: string;
+  status: 'aberta' | 'em_separacao' | 'parcial' | 'separada' | 'concluida' | 'cancelada';
+  solicitante?: string;
   criadoEm: string;
 }
 
-export interface TicketMessage {
+export interface Customer {
   id: string;
-  ticketId: string;
-  tipo: 'nota_interna' | 'resposta_cliente' | 'mensagem_cliente' | 'evento';
-  autorId?: string;
-  conteudo: string;
-  criadoEm: string;
+  nome: string;
+  cnpjCpf: string;
+  contatoNome?: string;
+  email?: string;
+  telefone?: string;
+  cidade?: string;
+  uf?: string;
+  ativo: boolean;
 }
 
-export interface TicketPart {
-  id: string;
-  ticketId: string;
-  productId: string;
-  quantidade: number; // Milésimos
-  origem: 'estoque' | 'compra';
-  status: 'solicitada' | 'reservada' | 'separada' | 'entregue' | 'cancelada';
-  reservationId?: string;
-  requisitionId?: string;
-  cobrar?: boolean;
-}
-
-export interface CompanySettings {
+export interface Supplier {
   id: string;
   razaoSocial: string;
   nomeFantasia?: string;
   cnpj: string;
-  ie?: string;
-  endereco?: string;
-  bairro?: string;
-  cidade?: string;
-  uf?: string;
-  cep?: string;
+  contatoNome?: string;
   email?: string;
   telefone?: string;
-  seqReqPrefix?: string;
-  seqCotPrefix?: string;
-  seqPcPrefix?: string;
-  seqOpPrefix?: string;
-  seqPvPrefix?: string;
-  seqOsPrefix?: string;
-  seqTkPrefix?: string;
-  alertasAtivos?: boolean;
-  ativo?: boolean;
+  categoriaPrincipal?: string;
+  avaliacao?: number;
+  ativo: boolean;
+}
+
+export interface Quotation {
+  id: string;
+  codigo: string;
+  descricao: string;
+  status: 'nova_solicitacao' | 'em_analise' | 'enviada_fornecedor' | 'aguardando_resposta' | 'cotacao_recebida' | 'em_comparacao' | 'aguardando_aprovacao' | 'aprovada' | 'reprovada' | 'convertida_pedido' | 'arquivada';
+  dataAbertura: string;
+  dataLimite?: string;
+  solicitanteId?: string;
+  companyId?: string;
+}
+
+export interface QuotationItem {
+  id: string;
+  quotationId: string;
+  productId: string;
+  quantidade: number;
+  observacao?: string;
+}
+
+export interface QuotationSupplierPrice {
+  id: string;
+  quotationId: string;
+  supplierId: string;
+  productId: string;
+  precoUnitarioCents: number;
+  prazoEntregaDias: number;
+  condicaoPagamento?: string;
+  selecionado?: boolean;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  codigo: string;
+  supplierId: string;
+  quotationId?: string;
+  status: 'rascunho' | 'emitido' | 'confirmado_fornecedor' | 'recebido_parcial' | 'recebido' | 'cancelado';
+  valorTotalCents: number;
+  condicaoPagamento?: string;
+  previsaoEntrega: string;
+  companyId?: string;
+  criadoEm: string;
+}
+
+export interface SalesOrderItem {
+  id: string;
+  salesOrderId: string;
+  productId: string;
+  quantidade: number;
+  precoUnitarioCents: number;
+  valorTotalCents: number;
+  produzido?: boolean;
+  productionOrderId?: string;
+  productionOrderCodigo?: string;
+}
+
+export interface SalesOrder {
+  id: string;
+  codigo: string;
+  customerId: string;
+  status: 'orcamento' | 'confirmado' | 'em_producao' | 'parcial' | 'pronto_expedicao' | 'faturado' | 'entregue' | 'cancelado';
+  valorTotalCents: number;
+  condicaoPagamento?: string;
+  previsaoEntrega: string;
+  items?: SalesOrderItem[];
+  productionOrderIds?: string[];
+  productionOrderCodigos?: string[];
+  companyId?: string;
+  criadoEm: string;
+}
+
+export interface FluxaTask {
+  id: string;
+  userId: string;
+  text: string;
+  completed: boolean;
+  priority?: 'baixa' | 'normal' | 'alta' | 'urgente';
+  dueDate?: string;
+  createdAt: string;
+}
+
+export interface ShoppingItem {
+  id: string;
+  userId: string;
+  item: string;
+  quantity?: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  action: string;
+  actor: {
+    id: string;
+    name: string;
+  };
+  target?: {
+    tipo: string;
+    id?: string;
+    codigo?: string;
+  };
+  details: string;
+}
+
+export interface CustomLogos {
+  fluxa?: string | null;
+  logo_icone?: string | null;
+  logo_texto?: string | null;
+  jp3d?: string | null;
+  sidebar?: string | null;
+  _v?: number | string;
+}
+
+export interface DatabaseState {
+  company: Company;
+  companies: Company[];
+  users: User[];
+  currentCompanyId: string;
+  customLogos: CustomLogos;
+  materialCategories: MaterialCategory[];
+  products: Product[];
+  warehouses: Warehouse[];
+  locations: WarehouseLocation[];
+  stockBalances: StockBalance[];
+  stockMovements: StockMovement[];
+  stockReservations: StockReservation[];
+  bomVersions: BOMVersion[];
+  bomItems: BOMItem[];
+  workCenters: WorkCenter[];
+  productionOrders: ProductionOrder[];
+  pickingOrders: PickingOrder[];
+  customers: Customer[];
+  suppliers: Supplier[];
+  quotations: Quotation[];
+  quotationItems: QuotationItem[];
+  quotationPrices: QuotationSupplierPrice[];
+  orders: PurchaseOrder[];
+  salesOrders: SalesOrder[];
+  gescompTasks: FluxaTask[];
+  gescompShoppingList: ShoppingItem[];
+  auditLogs: AuditLog[];
+  userPermissionOverrides?: Record<string, Record<string, boolean>>;
+  customNavLabels?: Record<string, string>;
+  lastBackup?: string;
 }

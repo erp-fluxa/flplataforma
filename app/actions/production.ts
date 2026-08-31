@@ -106,3 +106,79 @@ export async function updateOpStatus(
     return { success: false, error: err.message }
   }
 }
+
+export async function deleteProductionOrderWithRollback(opId: string) {
+  try {
+    const supabase = createClient()
+
+    // 1. Buscar a OP para obter número
+    const { data: op } = await (supabase as any)
+      .from('production_orders')
+      .select('id, numero')
+      .eq('id', opId)
+      .maybeSingle()
+
+    // 2. Estornar movimentações de estoque originadas por esta OP
+    const { data: movements } = await (supabase as any)
+      .from('stock_movements')
+      .select('*')
+      .eq('origem_id', opId)
+
+    if (movements && movements.length > 0) {
+      for (const mov of movements) {
+        if (mov.tipo === 'saida' || mov.sinal === -1) {
+          await (supabase as any).from('stock_movements').insert({
+            id: 'mov-' + Math.random().toString(36).substring(2, 9),
+            product_id: mov.product_id,
+            warehouse_id: mov.warehouse_id,
+            tipo: 'entrada',
+            quantidade: mov.quantidade,
+            sinal: 1,
+            custo_unitario: mov.custo_unitario || 0,
+            usuario_nome: 'Sistema (Estorno OP)',
+            observacao: `Estorno de saída/consumo referente à exclusão da ${op?.numero || opId}`
+          })
+
+          const { data: bal } = await (supabase as any)
+            .from('stock_balances')
+            .select('id, quantidade')
+            .eq('product_id', mov.product_id)
+            .eq('warehouse_id', mov.warehouse_id)
+            .maybeSingle()
+
+          if (bal) {
+            await (supabase as any)
+              .from('stock_balances')
+              .update({
+                quantidade: Number(bal.quantidade || 0) + Number(mov.quantidade || 0),
+                atualizado_em: new Date().toISOString()
+              })
+              .eq('id', bal.id)
+          }
+        }
+      }
+    }
+
+    // 3. Remover materiais vinculados à OP
+    await (supabase as any)
+      .from('production_order_materials')
+      .delete()
+      .eq('production_order_id', opId)
+
+    // 4. Deletar a OP
+    const { error: delErr } = await (supabase as any)
+      .from('production_orders')
+      .delete()
+      .eq('id', opId)
+
+    if (delErr) return { success: false, error: delErr.message }
+
+    revalidatePath('/producao')
+    revalidatePath('/estoque')
+    revalidatePath('/')
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Falha ao excluir OP com estorno' }
+  }
+}

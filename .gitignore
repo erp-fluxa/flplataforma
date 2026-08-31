@@ -2,6 +2,7 @@
 node_modules/
 dist/
 .vite/
+.next/
 
 # Variáveis de ambiente e segredos
 .env

@@ -137,3 +137,96 @@ export async function createSalesOrder(payload: {
     return { success: false, error: err.message }
   }
 }
+
+export async function deleteSalesOrderWithRollback(salesOrderId: string) {
+  try {
+    const supabase = createClient()
+
+    // 1. Buscar a venda para saber número/detalhes
+    const { data: pv } = await (supabase as any)
+      .from('sales_orders')
+      .select('id, numero')
+      .eq('id', salesOrderId)
+      .maybeSingle()
+
+    // 2. Buscar OPs vinculadas a esta venda
+    const { data: ops } = await (supabase as any)
+      .from('production_orders')
+      .select('id, numero')
+      .eq('sales_order_id', salesOrderId)
+
+    const opIds = (ops || []).map((o: any) => o.id)
+
+    // 3. Estornar movimentações de estoque originadas por esta venda ou por suas OPs
+    const { data: movements } = await (supabase as any)
+      .from('stock_movements')
+      .select('*')
+      .or(`origem_id.eq.${salesOrderId},origem_id.in.(${opIds.length > 0 ? opIds.join(',') : 'null'})`)
+
+    if (movements && movements.length > 0) {
+      for (const mov of movements) {
+        if (mov.tipo === 'saida' || mov.sinal === -1) {
+          // Estorno de saída: insere entrada e repõe saldo
+          await (supabase as any).from('stock_movements').insert({
+            id: 'mov-' + Math.random().toString(36).substring(2, 9),
+            product_id: mov.product_id,
+            warehouse_id: mov.warehouse_id,
+            tipo: 'entrada',
+            quantidade: mov.quantidade,
+            sinal: 1,
+            custo_unitario: mov.custo_unitario || 0,
+            usuario_nome: 'Sistema (Estorno)',
+            observacao: `Estorno de saída referente à exclusão da Venda ${pv?.numero || salesOrderId}`
+          })
+
+          const { data: bal } = await (supabase as any)
+            .from('stock_balances')
+            .select('id, quantidade')
+            .eq('product_id', mov.product_id)
+            .eq('warehouse_id', mov.warehouse_id)
+            .maybeSingle()
+
+          if (bal) {
+            await (supabase as any)
+              .from('stock_balances')
+              .update({
+                quantidade: Number(bal.quantidade || 0) + Number(mov.quantidade || 0),
+                atualizado_em: new Date().toISOString()
+              })
+              .eq('id', bal.id)
+          }
+        }
+      }
+    }
+
+    // 4. Remover materiais e OPs vinculadas
+    if (opIds.length > 0) {
+      await (supabase as any)
+        .from('production_order_materials')
+        .delete()
+        .in('production_order_id', opIds)
+
+      await (supabase as any)
+        .from('production_orders')
+        .delete()
+        .in('id', opIds)
+    }
+
+    // 5. Deletar a Venda
+    const { error: delErr } = await (supabase as any)
+      .from('sales_orders')
+      .delete()
+      .eq('id', salesOrderId)
+
+    if (delErr) return { success: false, error: delErr.message }
+
+    revalidatePath('/vendas')
+    revalidatePath('/producao')
+    revalidatePath('/estoque')
+    revalidatePath('/')
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Falha ao excluir venda com estorno' }
+  }
+}
