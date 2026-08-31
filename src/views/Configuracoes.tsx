@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Image, User as UserIcon, Building2, Cloud, Upload, RefreshCw, CheckCircle, Trash2, Eye, Edit, Power, PowerOff, ShieldCheck, Mail, Lock } from 'lucide-react';
+import { Settings, Image, User as UserIcon, Building2, Cloud, Upload, RefreshCw, CheckCircle, Trash2, Eye, Edit, Power, PowerOff, ShieldCheck, Mail, Lock, Key } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
 import { Button, Card, Badge, Modal } from '../components/ui';
@@ -13,7 +13,8 @@ export const Configuracoes: React.FC = () => {
 
   const isSuperAdmin = user?.roleId === 'super_admin' || user?.roleId === 'admin' || user?.role?.name?.toLowerCase().includes('admin') || user?.username === 'admin';
 
-  const [activeTab, setActiveTab] = useState<'visual' | 'usuarios' | 'empresa' | 'nuvem'>('visual');
+  const [activeTab, setActiveTab] = useState<'visual' | 'usuarios' | 'empresa' | 'nuvem' | 'integracoes'>('visual');
+
 
   // Modal Novo / Editar Usuário
   const [modalUserOpen, setModalUserOpen] = useState(false);
@@ -752,6 +753,42 @@ export const Configuracoes: React.FC = () => {
           </div>
         </Card>
       )}
+
+      {/* ABA 5: PARÂMETROS & FISCAIS */}
+      {activeTab === 'integracoes' && (
+        <Card title="Parâmetros Gerais & Configurações Fiscais">
+          <div className="space-y-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
+                <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Key className="w-4 h-4 text-brand-500" /> Regime Tributário & Faturamento
+                </h4>
+                <p className="text-slate-500 text-[11px]">
+                  Configuração aplicada para emissão de pedidos e documentos fiscais das empresas do grupo.
+                </p>
+                <div className="pt-2 text-slate-700 dark:text-slate-300 space-y-1 font-mono text-[11px]">
+                  <div>Ambiente: <span className="text-emerald-400 font-bold">Produção (Sincronizado)</span></div>
+                  <div>Multi-CNPJ: <span className="text-teal-400 font-bold">Habilitado ({db.companies?.length || 1} unidades cadastradas)</span></div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
+                <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-500" /> Segurança & Autenticação
+                </h4>
+                <p className="text-slate-500 text-[11px]">
+                  Controle de perfis, auditoria de ações e persistência segura em tempo real.
+                </p>
+                <div className="pt-2 text-slate-700 dark:text-slate-300 space-y-1 font-mono text-[11px]">
+                  <div>Armazenamento Seguro: <span className="text-emerald-400 font-bold">Ativo (SafeStorage)</span></div>
+                  <div>Logs de Auditoria: <span className="text-teal-400 font-bold">{db.auditLogs?.length || 0} registros registrados</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
 
       {/* MODAL VIEW USUÁRIO */}
       <Modal isOpen={modalViewUserOpen} onClose={() => setModalViewUserOpen(false)} title={`Ficha do Usuário — ${selectedViewUser?.name}`}>
