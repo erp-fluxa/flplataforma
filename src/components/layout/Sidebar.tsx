@@ -43,8 +43,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const iconeSrc = db.customLogos?.logo_icone || db.company?.logo_icone_url || SITE_CONFIG.defaultLogoIcone;
   const textoSrc = db.customLogos?.logo_texto || db.customLogos?.fluxa || db.company?.logo_texto_url || SITE_CONFIG.defaultLogoTexto;
+  const version = db.customLogos?._v || SITE_CONFIG.buildTimestamp;
+
   const versionedIcone = (iconeSrc.startsWith('data:') || iconeSrc.startsWith('blob:')) ? iconeSrc : `${iconeSrc}?v=${version}`;
   const versionedTexto = (textoSrc.startsWith('data:') || textoSrc.startsWith('blob:')) ? textoSrc : `${textoSrc}?v=${version}`;
+
 
   const navGroups: NavGroup[] = [
     {
