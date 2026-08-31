@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { DatabaseState, CustomLogos, Product, User, Company, ProductionOrder, Quotation, QuotationItem, PurchaseOrder, SalesOrder, StockMovement, StockReservation } from '../types';
+import { DatabaseState, CustomLogos, Product, User, Company, ProductionOrder, Quotation, QuotationItem, PurchaseOrder, SalesOrder, StockMovement, StockReservation, MaterialCategory } from '../types';
 import { INITIAL_DATABASE } from '../lib/initialData';
 import { getSupabase } from '../lib/supabase';
-import { uid } from '../lib/formatters';
+import { uid, validarCNPJ, mascaraCNPJ } from '../lib/formatters';
+import { safeLocalStorage } from '../lib/safeStorage';
 
 export interface ProcessarVendaResult {
   success: boolean;
@@ -42,69 +43,55 @@ interface DbContextType {
 
 const DbContext = createContext<DbContextType | null>(null);
 
-const STORAGE_KEYS = [
-  'fluxa_app_state_v2',
-  'fluxa_app_state',
-  'fluxa_erp_db_v2',
-  'fluxa_erp_db',
-  'fluxa_state'
-];
+const STORAGE_KEYS = ['fluxa_db_v2', 'fluxa_erp_db', 'fluxa_local_db'];
 
-/**
- * Realiza o merge seguro de arrays por ID:
- * Se um registro já existe, preserva os dados do usuário. Novos itens do sistema são adicionados apenas se não existirem.
- */
-function mergeArrayById<T extends { id: string }>(base: T[] = [], incoming: T[] = []): T[] {
+function mergeArrayById<T extends { id?: string }>(base: T[] = [], incoming: T[] = []): T[] {
   const map = new Map<string, T>();
-
-  (base || []).forEach(item => {
-    if (item && item.id) map.set(item.id, item);
+  base.forEach(item => {
+    if (item?.id) map.set(item.id, item);
   });
-
-  (incoming || []).forEach(item => {
-    if (item && item.id) {
-      const existing = map.get(item.id);
-      map.set(item.id, Object.assign({}, existing, item));
-    }
+  incoming.forEach(item => {
+    if (item?.id) map.set(item.id, item);
   });
-
   return Array.from(map.values());
 }
 
-/**
- * Função de merge profundo que nunca apaga dados de usuários
- */
 function deepMergeDbState(base: DatabaseState, userState: Partial<DatabaseState>): DatabaseState {
   if (!userState) return base;
-
   return {
     ...base,
     ...userState,
-    company: Object.assign({}, base.company, userState.company),
-    companies: mergeArrayById(base.companies || [], userState.companies || []),
-    currentCompanyId: userState.currentCompanyId || base.currentCompanyId || 'comp-1',
-    customLogos: Object.assign({}, base.customLogos, userState.customLogos),
-    users: mergeArrayById(base.users, userState.users),
-    roles: mergeArrayById((base as any).roles || [], (userState as any).roles || []),
-    materialCategories: mergeArrayById(base.materialCategories, userState.materialCategories),
-    products: mergeArrayById(base.products, userState.products),
-    warehouses: mergeArrayById(base.warehouses, userState.warehouses),
-    locations: mergeArrayById(base.locations, userState.locations),
-    bomVersions: mergeArrayById(base.bomVersions, userState.bomVersions),
-    bomItems: mergeArrayById(base.bomItems, userState.bomItems),
-    workCenters: mergeArrayById(base.workCenters, userState.workCenters),
-    customers: mergeArrayById(base.customers, userState.customers),
-    suppliers: mergeArrayById(base.suppliers, userState.suppliers),
-    quotations: mergeArrayById(base.quotations, userState.quotations),
-    quotationItems: mergeArrayById(base.quotationItems, userState.quotationItems),
-    quotationPrices: mergeArrayById(base.quotationPrices, userState.quotationPrices),
-    orders: mergeArrayById(base.orders, userState.orders),
-    salesOrders: mergeArrayById(base.salesOrders, userState.salesOrders),
-    productionOrders: mergeArrayById(base.productionOrders, userState.productionOrders),
-    pickingOrders: mergeArrayById(base.pickingOrders, userState.pickingOrders),
-    gescompTasks: mergeArrayById(base.gescompTasks, userState.gescompTasks),
-    gescompShoppingList: mergeArrayById(base.gescompShoppingList, userState.gescompShoppingList),
-    auditLogs: Array.isArray(userState.auditLogs) && userState.auditLogs.length > 0 ? userState.auditLogs : base.auditLogs,
+    company: {
+      ...(base.company || {}),
+      ...(userState.company || {})
+    },
+    companies: Array.isArray(userState.companies) && userState.companies.length > 0
+      ? userState.companies
+      : (base.companies || []),
+    currentCompanyId: userState.currentCompanyId || base.currentCompanyId || 'emp-matriz',
+    customLogos: {
+      ...(base.customLogos || {}),
+      ...(userState.customLogos || {})
+    },
+    systemSettings: {
+      ...(base.systemSettings || {}),
+      ...(userState.systemSettings || {})
+    },
+    users: mergeArrayById(base.users || [], userState.users || []),
+    roles: mergeArrayById(base.roles || [], userState.roles || []),
+    customers: mergeArrayById(base.customers || [], userState.customers || []),
+    suppliers: mergeArrayById(base.suppliers || [], userState.suppliers || []),
+    products: mergeArrayById(base.products || [], userState.products || []),
+    materialCategories: mergeArrayById(base.materialCategories || [], userState.materialCategories || []),
+    bomItems: mergeArrayById(base.bomItems || [], userState.bomItems || []),
+    quotations: mergeArrayById(base.quotations || [], userState.quotations || []),
+    quotationItems: mergeArrayById(base.quotationItems || [], userState.quotationItems || []),
+    quotationPrices: mergeArrayById(base.quotationPrices || [], userState.quotationPrices || []),
+    orders: mergeArrayById(base.orders || [], userState.orders || []),
+    purchaseOrders: mergeArrayById(base.purchaseOrders || [], userState.purchaseOrders || []),
+    productionOrders: mergeArrayById(base.productionOrders || [], userState.productionOrders || []),
+    salesOrders: mergeArrayById(base.salesOrders || [], userState.salesOrders || []),
+    auditLogs: mergeArrayById(base.auditLogs || [], userState.auditLogs || []),
     stockBalances: Array.isArray(userState.stockBalances) ? userState.stockBalances : base.stockBalances,
     stockMovements: Array.isArray(userState.stockMovements) ? userState.stockMovements : base.stockMovements,
     stockReservations: Array.isArray(userState.stockReservations) ? userState.stockReservations : base.stockReservations,
@@ -118,7 +105,7 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
     for (const key of STORAGE_KEYS) {
       try {
-        const saved = localStorage.getItem(key);
+        const saved = safeLocalStorage.getItem(key);
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed && typeof parsed === 'object') {
@@ -140,7 +127,6 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const realtimeChannelRef = React.useRef<any>(null);
   const lastSyncTimestampRef = React.useRef<string>('');
 
-  // Sincronização centralizada a partir do Supabase Cloud
   const syncFromCloud = useCallback(async () => {
     const sb = getSupabase();
     if (!sb) {
@@ -167,9 +153,7 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
             merged.lastBackup = backupTimestamp;
 
             STORAGE_KEYS.forEach(key => {
-              try {
-                localStorage.setItem(key, JSON.stringify(merged));
-              } catch (_) {}
+              safeLocalStorage.setItem(key, JSON.stringify(merged));
             });
 
             return merged;
@@ -184,19 +168,14 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     }
   }, []);
 
-  // Salvar no LocalStorage, Supabase e disparar broadcast para todos os aparelhos
   const persistAndBroadcast = useCallback(async (newDb: DatabaseState, actionName: string = 'STATE_SYNC') => {
     const nowIso = new Date().toISOString();
     lastSyncTimestampRef.current = nowIso;
 
-    // 1. Salvar no LocalStorage (disparará evento 'storage' para outras abas no mesmo dispositivo)
     STORAGE_KEYS.forEach(key => {
-      try {
-        localStorage.setItem(key, JSON.stringify(newDb));
-      } catch (_) {}
+      safeLocalStorage.setItem(key, JSON.stringify(newDb));
     });
 
-    // 2. Disparar evento broadcast WebSocket imediatamente se o canal estiver pronto
     if (realtimeChannelRef.current) {
       try {
         realtimeChannelRef.current.send({

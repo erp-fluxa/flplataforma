@@ -3,6 +3,7 @@ import { Eye, EyeOff, Lock, User as UserIcon, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useDb } from '../context/DbContext';
 import { SITE_CONFIG } from '../config/site';
+import { safeLocalStorage } from '../lib/safeStorage';
 
 export const Login: React.FC = () => {
   const { login } = useAuth();
@@ -10,19 +11,11 @@ export const Login: React.FC = () => {
 
   // Usuário pode ser lembrado se o checkbox foi marcado, mas a SENHA NUNCA é salva
   const [username, setUsername] = useState(() => {
-    try {
-      return localStorage.getItem('fluxa_remembered_username') || '';
-    } catch (_) {
-      return '';
-    }
+    return safeLocalStorage.getItem('fluxa_remembered_username') || '';
   });
   const [password, setPassword] = useState(''); // Senha sempre vazia por padrão
   const [remember, setRemember] = useState(() => {
-    try {
-      return !!localStorage.getItem('fluxa_remembered_username');
-    } catch (_) {
-      return false;
-    }
+    return !!safeLocalStorage.getItem('fluxa_remembered_username');
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -34,13 +27,9 @@ export const Login: React.FC = () => {
     setLoading(true);
 
     if (remember && username.trim()) {
-      try {
-        localStorage.setItem('fluxa_remembered_username', username.trim());
-      } catch (_) {}
+      safeLocalStorage.setItem('fluxa_remembered_username', username.trim());
     } else {
-      try {
-        localStorage.removeItem('fluxa_remembered_username');
-      } catch (_) {}
+      safeLocalStorage.removeItem('fluxa_remembered_username');
     }
 
     setTimeout(() => {
@@ -56,8 +45,9 @@ export const Login: React.FC = () => {
   const institutionalLogo = db.customLogos?.jp3d || db.company?.logo_institucional_url || SITE_CONFIG.defaultLogoInstitucional;
   const version = db.customLogos?._v || SITE_CONFIG.buildTimestamp;
 
-  const versionedLoginLogo = loginLogo.startsWith('data:') ? loginLogo : `${loginLogo}?v=${version}`;
-  const versionedInstLogo = institutionalLogo.startsWith('data:') ? institutionalLogo : `${institutionalLogo}?v=${version}`;
+  const versionedLoginLogo = (loginLogo.startsWith('data:') || loginLogo.startsWith('blob:')) ? loginLogo : `${loginLogo}?v=${version}`;
+  const versionedInstLogo = (institutionalLogo.startsWith('data:') || institutionalLogo.startsWith('blob:')) ? institutionalLogo : `${institutionalLogo}?v=${version}`;
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#070D1F] p-4 text-slate-100 font-sans selection:bg-brand-500 selection:text-white">

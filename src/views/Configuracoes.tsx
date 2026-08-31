@@ -32,6 +32,10 @@ export const Configuracoes: React.FC = () => {
   const loginLogoSrc = db.customLogos?.fluxa || db.customLogos?.logo_texto || SITE_CONFIG.defaultLogoLogin;
   const instLogoSrc = db.customLogos?.jp3d || db.company?.logo_institucional_url || SITE_CONFIG.defaultLogoInstitucional;
   const version = db.customLogos?._v || SITE_CONFIG.buildTimestamp;
+  const getVersionedSrc = (src: string) => {
+    if (!src) return '';
+    return (src.startsWith('data:') || src.startsWith('blob:')) ? src : `${src}?v=${version}`;
+  };
 
   const handleFileUpload = (type: keyof CustomLogos, file: File | null) => {
     if (!file) return;
@@ -59,28 +63,27 @@ export const Configuracoes: React.FC = () => {
       return;
     }
 
-    const newUser: User = {
-      id: editingUser.id || uid('usr'),
-      name: editingUser.name,
-      username: editingUser.username.toLowerCase().trim(),
-      email: editingUser.email || '',
-      password: editingUser.password || '123',
-      roleId: editingUser.roleId || 'usuario',
-      role: {
-        id: editingUser.roleId || 'usuario',
-        name: editingUser.roleId === 'super_admin' ? 'Super Admin' : (editingUser.roleId === 'admin' ? 'Administrador' : (editingUser.roleId === 'role-comprador-sr' ? 'Comprador Sênior' : (editingUser.roleId === 'role-producao' ? 'Engenheiro de Produção' : 'Operador')))
-      },
-      permissoes: editingUser.roleId === 'super_admin' ? ['*'] : [],
-      allowedCompanyIds: editingUser.roleId === 'super_admin' ? [] : (editingUser.allowedCompanyIds || []),
-      active: editingUser.active !== false,
-      preferences: { sidebarCollapsed: false, theme: 'dark' }
-    };
-
-    await updateDb(prev => {
-      const existing = prev.users.find(u => u.id === newUser.id);
-      const users = existing
-        ? prev.users.map(u => u.id === newUser.id ? newUser : u)
-        : [...prev.users, newUser];
+    const res = await updateDb(prev => {
+      const users = [...(prev.users || [])];
+      if (editingUser.id) {
+        const idx = users.findIndex(u => u.id === editingUser.id);
+        if (idx !== -1) {
+          users[idx] = { ...users[idx], ...editingUser } as User;
+        }
+      } else {
+        const newUser: User = {
+          id: `usr-${Date.now()}`,
+          username: editingUser.username!,
+          name: editingUser.name!,
+          email: editingUser.email || `${editingUser.username}@empresa.com`,
+          password: editingUser.password || '123',
+          roleId: editingUser.roleId || 'operador',
+          role: { id: editingUser.roleId || 'operador', name: editingUser.roleId || 'Operador' },
+          permissoes: editingUser.permissoes || ['compras_ver', 'estoque_ver', 'producao_ver', 'vendas_ver'],
+          active: editingUser.active !== false
+        };
+        users.push(newUser);
+      }
       return { ...prev, users };
     }, 'USER_SAVED');
 
@@ -89,54 +92,48 @@ export const Configuracoes: React.FC = () => {
     alert('Usuário salvo com sucesso!');
   };
 
-  const handleToggleUserStatus = async (u: User) => {
-    if (u.id === 'usr-admin' || u.username === 'admin') {
-      alert('O Super Admin principal não pode ser bloqueado.');
+  const handleToggleUserStatus = async (userToToggle: User) => {
+    if (userToToggle.roleId === 'super_admin' && userToToggle.username === 'admin') {
+      alert('O usuário administrador principal não pode ser desativado.');
       return;
     }
 
-    const nextStatus = !u.active;
     await updateDb(prev => ({
       ...prev,
-      users: prev.users.map(item => item.id === u.id ? { ...item, active: nextStatus } : item)
+      users: (prev.users || []).map(u => u.id === userToToggle.id ? { ...u, active: !u.active } : u)
     }), 'USER_STATUS_TOGGLED');
-
-    alert(`Usuário ${u.name} ${nextStatus ? 'desbloqueado/ativado' : 'bloqueado/inativado'} com sucesso!`);
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (userId === 'usr-admin') {
-      alert('Não é permitido excluir o Super Admin padrão do sistema.');
-      return;
-    }
-    if (confirm('Deseja realmente remover este usuário do sistema?')) {
-      await updateDb(prev => ({
-        ...prev,
-        users: prev.users.filter(u => u.id !== userId)
-      }), 'USER_DELETED');
-      alert('Usuário removido com sucesso!');
-    }
+  const handleOpenEditUser = (userToEdit: User) => {
+    setEditingUser({ ...userToEdit });
+    setModalUserOpen(true);
   };
 
-  // Handlers de Gestão de Empresas (Multi-CNPJ)
+  const handleOpenNewUser = () => {
+    setEditingUser({
+      name: '',
+      username: '',
+      email: '',
+      password: '',
+      roleId: 'operador',
+      permissoes: ['compras_ver', 'estoque_ver', 'producao_ver', 'vendas_ver'],
+      active: true
+    });
+    setModalUserOpen(true);
+  };
+
+  // Funções Multi-Empresa
   const handleOpenNewEmpresa = () => {
     if (!isSuperAdmin) {
-      alert('Apenas o Super Admin tem permissão para cadastrar novas empresas do grupo.');
+      alert('Apenas o Super Admin tem permissão para cadastrar novas empresas / CNPJs.');
       return;
     }
     setEditingEmpresa({
-      id: '',
-      nome: '',
       razaoSocial: '',
       nomeFantasia: '',
-      fantasia: '',
       cnpj: '',
       inscricaoEstadual: '',
-      inscricaoMunicipal: '',
-      cep: '',
       endereco: '',
-      numero: '',
-      bairro: '',
       cidade: '',
       uf: 'SC',
       telefone: '',
@@ -230,7 +227,13 @@ export const Configuracoes: React.FC = () => {
           onClick={() => setActiveTab('nuvem')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all ${activeTab === 'nuvem' ? 'bg-brand-700 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 hover:bg-slate-200'}`}
         >
-          <Cloud className="w-3.5 h-3.5" /> 4. Supabase & Nuvem
+          <Cloud className="w-3.5 h-3.5" /> 4. Sincronização em Nuvem
+        </button>
+        <button
+          onClick={() => setActiveTab('integracoes')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all ${activeTab === 'integracoes' ? 'bg-brand-700 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 hover:bg-slate-200'}`}
+        >
+          <Key className="w-3.5 h-3.5" /> 5. Parâmetros & Fiscais
         </button>
       </div>
 
@@ -281,10 +284,10 @@ export const Configuracoes: React.FC = () => {
                 </span>
                 <div className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-950 border border-slate-800 max-w-[280px]">
                   <div className="flex items-center justify-center w-12 h-12 shrink-0 rounded-xl bg-slate-800/90 border border-slate-700/80 p-1.5 shadow-md">
-                    <img src={`${iconeSrc}?v=${version}`} alt="Ícone" className="w-full h-full object-contain filter drop-shadow" />
+                    <img src={getVersionedSrc(iconeSrc)} alt="Ícone" className="w-full h-full object-contain filter drop-shadow" />
                   </div>
                   <div className="flex flex-col justify-center min-w-0 flex-1">
-                    <img src={`${textoSrc}?v=${version}`} alt="Texto" className="h-8 max-w-[155px] object-contain object-left filter drop-shadow" />
+                    <img src={getVersionedSrc(textoSrc)} alt="Texto" className="h-8 max-w-[155px] object-contain object-left filter drop-shadow" />
                     <span className="text-[10.5px] font-mono text-teal-400 font-bold block tracking-tight truncate mt-0.5">
                       {SITE_CONFIG.defaultCompanySubtitle}
                     </span>
@@ -299,7 +302,7 @@ export const Configuracoes: React.FC = () => {
                 </span>
                 <div className="flex items-center justify-center p-2 rounded-xl bg-slate-950 border border-slate-800 w-20 mx-auto">
                   <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-slate-800/90 border border-slate-700/80 p-1.5 shadow-md">
-                    <img src={`${iconeSrc}?v=${version}`} alt="Ícone" className="w-full h-full object-contain filter drop-shadow" />
+                    <img src={getVersionedSrc(iconeSrc)} alt="Ícone" className="w-full h-full object-contain filter drop-shadow" />
                   </div>
                 </div>
               </div>
@@ -317,7 +320,7 @@ export const Configuracoes: React.FC = () => {
                 </Badge>
               </div>
               <div className="h-20 rounded-xl bg-slate-950 flex items-center justify-center p-3 border border-slate-800">
-                <img src={`${iconeSrc}?v=${version}`} className="h-10 w-10 object-contain" alt="Preview Ícone" />
+                <img src={getVersionedSrc(iconeSrc)} className="h-10 w-10 object-contain" alt="Preview Ícone" />
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 mb-1">Subir Ícone Isolado (PNG/SVG)</label>
@@ -339,7 +342,7 @@ export const Configuracoes: React.FC = () => {
                 </Badge>
               </div>
               <div className="h-20 rounded-xl bg-slate-950 flex items-center justify-center p-3 border border-slate-800">
-                <img src={`${textoSrc}?v=${version}`} className="h-8 max-h-9 w-auto max-w-[150px] object-contain" alt="Preview Wordmark" />
+                <img src={getVersionedSrc(textoSrc)} className="h-8 max-h-9 w-auto max-w-[150px] object-contain" alt="Preview Wordmark" />
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 mb-1">Subir Texto/Wordmark (PNG/SVG)</label>
@@ -361,7 +364,7 @@ export const Configuracoes: React.FC = () => {
                 </Badge>
               </div>
               <div className="h-20 rounded-xl bg-slate-950 flex items-center justify-center p-3 border border-slate-800">
-                <img src={`${loginLogoSrc}?v=${version}`} className="h-8 max-h-9 w-auto max-w-[150px] object-contain" alt="Preview Login" />
+                <img src={getVersionedSrc(loginLogoSrc)} className="h-8 max-h-9 w-auto max-w-[150px] object-contain" alt="Preview Login" />
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 mb-1">Subir Imagem Login (PNG/SVG)</label>
@@ -383,7 +386,7 @@ export const Configuracoes: React.FC = () => {
                 </Badge>
               </div>
               <div className="h-20 rounded-xl bg-slate-950 flex items-center justify-center p-3 border border-slate-800">
-                <img src={`${instLogoSrc}?v=${version}`} className="h-8 w-auto object-contain" alt="Preview Topo" />
+                <img src={getVersionedSrc(instLogoSrc)} className="h-8 w-auto object-contain" alt="Preview Topo" />
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 mb-1">Subir Topo Login (PNG/SVG)</label>

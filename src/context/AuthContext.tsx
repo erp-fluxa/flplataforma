@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User } from '../types';
 import { useDb } from './DbContext';
+import { safeLocalStorage, safeSessionStorage } from '../lib/safeStorage';
 
 interface AuthContextType {
   user: User | null;
@@ -19,7 +20,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { db, updateDb } = useDb();
   const [user, setUser] = useState<User | null>(() => {
     try {
-      const saved = sessionStorage.getItem(SESSION_USER_KEY) || localStorage.getItem(SESSION_USER_KEY);
+      const saved = safeSessionStorage.getItem(SESSION_USER_KEY) || safeLocalStorage.getItem(SESSION_USER_KEY);
       if (saved) return JSON.parse(saved);
     } catch (_) {}
     return null;
@@ -53,8 +54,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         preferences: { sidebarCollapsed: false, theme: 'dark' }
       };
       setUser(adminUser);
-      if (remember) localStorage.setItem(SESSION_USER_KEY, JSON.stringify(adminUser));
-      else sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(adminUser));
+      if (remember) safeLocalStorage.setItem(SESSION_USER_KEY, JSON.stringify(adminUser));
+      else safeSessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(adminUser));
       return { success: true };
     }
 
@@ -72,8 +73,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         preferences: { sidebarCollapsed: false, theme: 'dark' }
       };
       setUser(jmUser);
-      if (remember) localStorage.setItem(SESSION_USER_KEY, JSON.stringify(jmUser));
-      else sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(jmUser));
+      if (remember) safeLocalStorage.setItem(SESSION_USER_KEY, JSON.stringify(jmUser));
+      else safeSessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(jmUser));
       return { success: true };
     }
 
@@ -92,9 +93,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setUser(found);
     if (remember) {
-      localStorage.setItem(SESSION_USER_KEY, JSON.stringify(found));
+      safeLocalStorage.setItem(SESSION_USER_KEY, JSON.stringify(found));
     } else {
-      sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(found));
+      safeSessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(found));
     }
 
     return { success: true };
@@ -102,8 +103,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(() => {
     setUser(null);
-    sessionStorage.removeItem(SESSION_USER_KEY);
-    localStorage.removeItem(SESSION_USER_KEY);
+    safeSessionStorage.removeItem(SESSION_USER_KEY);
+    safeLocalStorage.removeItem(SESSION_USER_KEY);
   }, []);
 
   const toggleSidebar = useCallback(() => {
