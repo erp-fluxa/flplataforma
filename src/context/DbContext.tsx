@@ -297,58 +297,56 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     return result;
   }, [db.companies, updateDb]);
 
-  // EXCLUIR EMPRESA COM SOFT DELETE (Multi-CNPJ)
-  const excluirEmpresa = useCallback(async (companyId: string, actorName: string): Promise<{ success: boolean; error?: string; vinculos?: { pedidos: number; ops: number; compras: number } }> => {
-    const ativas = (db.companies || []).filter(c => c.ativa !== false);
-    if (ativas.length <= 1) {
-      return {
-        success: false,
-        error: 'Não é permitido desativar a única empresa ativa do sistema.'
-      };
-    }
-
-    const target = (db.companies || []).find(c => c.id === companyId);
+  // EXCLUIR EMPRESA DO CADASTRO (Multi-CNPJ)
+  const excluirEmpresa = useCallback(async (companyId: string, actorName: string): Promise<{ success: boolean; error?: string }> => {
+    const target = (db.companies || []).find(c => c.id === companyId) || (db.company?.id === companyId ? db.company : null);
     if (!target) {
-      return { success: false, error: 'Empresa não encontrada.' };
+      return { success: false, error: 'Empresa não encontrada para exclusão.' };
     }
 
     let result = { success: true, error: '' };
     await updateDb(prev => {
       const now = new Date().toISOString();
 
-      // Aplica Soft Delete
-      const companies = (prev.companies || []).map(c => {
-        if (c.id === companyId) {
-          return {
-            ...c,
-            ativa: false,
-            excluidaEm: now
-          };
-        }
-        return c;
-      });
+      // Remove a empresa da lista de empresas cadastradas
+      const remainingCompanies = (prev.companies || []).filter(c => c.id !== companyId);
 
       let currentCompanyId = prev.currentCompanyId;
       let company = prev.company;
 
-      if (currentCompanyId === companyId) {
-        const nextActive = companies.find(c => c.ativa !== false && c.isMatriz) || companies.find(c => c.ativa !== false) || companies[0];
-        currentCompanyId = nextActive.id;
-        company = nextActive;
+      if (remainingCompanies.length > 0) {
+        if (currentCompanyId === companyId || !remainingCompanies.some(c => c.id === currentCompanyId)) {
+          const nextActive = remainingCompanies.find(c => c.isMatriz) || remainingCompanies[0];
+          currentCompanyId = nextActive.id;
+          company = nextActive;
+        }
+      } else {
+        // Se todas as empresas foram excluídas, inicializa uma empresa padrão limpa
+        const defaultCleanCompany: Company = {
+          id: `emp-${Date.now()}`,
+          nome: 'Empresa Principal',
+          razaoSocial: '',
+          nomeFantasia: '',
+          cnpj: '',
+          isMatriz: true,
+          ativa: true
+        };
+        currentCompanyId = defaultCleanCompany.id;
+        company = defaultCleanCompany;
       }
 
       const auditLog = {
         id: uid('log'),
         timestamp: now,
-        action: 'COMPANY_SOFT_DELETED',
+        action: 'COMPANY_DELETED',
         actor: { id: 'usr', name: actorName || 'Super Admin' },
-        target: { tipo: 'EMPRESA', codigo: target.cnpj },
-        details: `Empresa [${target.cnpj}] ${target.nomeFantasia || target.nome} desativada (soft delete) por ${actorName || 'Super Admin'}.`
+        target: { tipo: 'EMPRESA', codigo: target.cnpj || target.id },
+        details: `Empresa [${target.cnpj || 'S/ CNPJ'}] ${target.nomeFantasia || target.razaoSocial || target.nome || 'Empresa'} excluída do cadastro por ${actorName || 'Super Admin'}.`
       };
 
       return {
         ...prev,
-        companies,
+        companies: remainingCompanies,
         company,
         currentCompanyId,
         auditLogs: [auditLog, ...(prev.auditLogs || [])]
@@ -356,7 +354,8 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     }, 'COMPANY_DELETED');
 
     return result;
-  }, [db.companies, updateDb]);
+  }, [db.companies, db.company, updateDb]);
+
 
   // SELECIONAR EMPRESA ATIVA
   const selecionarEmpresaAtiva = useCallback(async (companyId: string) => {

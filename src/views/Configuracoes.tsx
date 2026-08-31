@@ -174,28 +174,23 @@ export const Configuracoes: React.FC = () => {
 
   const handleDeleteEmpresa = async (comp: Company) => {
     if (!isSuperAdmin) {
-      alert('Apenas o Super Admin tem permissão para desativar empresas do grupo.');
+      alert('Apenas o Super Admin tem permissão para excluir empresas do grupo.');
       return;
     }
 
-    const pedidosCount = (db.salesOrders || []).filter(p => p.companyId === comp.id).length;
-    const opsCount = (db.productionOrders || []).filter(o => o.companyId === comp.id).length;
-    const balancesCount = (db.stockBalances || []).filter(b => b.companyId === comp.id && b.quantidade > 0).length;
+    const nomeEmpresa = comp.nomeFantasia || comp.razaoSocial || comp.nome || 'Empresa';
+    const cnpjDisplay = comp.cnpj ? `[${comp.cnpj}] ` : '';
 
-    let avisoVinculos = '';
-    if (pedidosCount > 0 || opsCount > 0 || balancesCount > 0) {
-      avisoVinculos = `\n\n⚠️ ATENÇÃO: Esta empresa possui registros vinculados:\n• ${pedidosCount} Pedido(s) de Venda\n• ${opsCount} Ordem(ns) de Produção\n• ${balancesCount} Item(ns) com Saldo em Estoque\n\nA desativação (Soft Delete) preservará o histórico de vínculos sem quebrar os dados.`;
-    }
-
-    if (confirm(`Tem certeza que deseja desativar a empresa [${comp.cnpj}] ${comp.nomeFantasia || comp.razaoSocial || comp.nome}?${avisoVinculos}\n\nDeseja prosseguir?`)) {
+    if (confirm(`Tem certeza que deseja excluir a empresa ${cnpjDisplay}${nomeEmpresa} do cadastro?\n\nEsta ação removerá a empresa do sistema.`)) {
       const res = await excluirEmpresa(comp.id, user?.name || 'Super Admin');
       if (res.success) {
-        alert('Empresa desativada (soft delete) com sucesso!');
+        alert(`Empresa ${nomeEmpresa} excluída com sucesso!`);
       } else {
-        alert(res.error || 'Erro ao desativar empresa.');
+        alert(res.error || 'Erro ao excluir empresa.');
       }
     }
   };
+
 
   const handleSelectEmpresa = async (comp: Company) => {
     await selecionarEmpresaAtiva(comp.id);
