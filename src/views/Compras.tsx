@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { ShoppingCart, FileSpreadsheet, CheckSquare, Plus } from 'lucide-react';
+import { ShoppingCart, FileSpreadsheet, CheckSquare, ListPlus } from 'lucide-react';
 import { Cotacoes } from './Cotacoes';
 import { PedidosCompra } from './PedidosCompra';
+import { ListaCompras } from './ListaCompras';
 import { Tarefas } from './Tarefas';
 
 interface ComprasProps {
-  defaultTab?: 'cotacoes' | 'pedidos' | 'tarefas';
+  defaultTab?: 'cotacoes' | 'pedidos' | 'lista' | 'tarefas';
 }
 
 export const Compras: React.FC<ComprasProps> = ({ defaultTab = 'cotacoes' }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'cotacoes' | 'pedidos' | 'tarefas'>(defaultTab);
+  const [activeSubTab, setActiveSubTab] = useState<'cotacoes' | 'pedidos' | 'lista' | 'tarefas'>(defaultTab);
 
   return (
     <div className="space-y-4">
@@ -40,6 +41,18 @@ export const Compras: React.FC<ComprasProps> = ({ defaultTab = 'cotacoes' }) => 
         </button>
 
         <button
+          onClick={() => setActiveSubTab('lista')}
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+            activeSubTab === 'lista'
+              ? 'bg-brand-700 text-white shadow-sm'
+              : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800'
+          }`}
+        >
+          <ListPlus className="w-4 h-4" />
+          <span>Lista de Compras & Cotações Rápidas</span>
+        </button>
+
+        <button
           onClick={() => setActiveSubTab('tarefas')}
           className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
             activeSubTab === 'tarefas'
@@ -56,6 +69,7 @@ export const Compras: React.FC<ComprasProps> = ({ defaultTab = 'cotacoes' }) => 
       <div>
         {activeSubTab === 'cotacoes' && <Cotacoes />}
         {activeSubTab === 'pedidos' && <PedidosCompra />}
+        {activeSubTab === 'lista' && <ListaCompras />}
         {activeSubTab === 'tarefas' && <Tarefas />}
       </div>
     </div>

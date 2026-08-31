@@ -315,12 +315,47 @@ export interface FluxaTask {
   createdAt: string;
 }
 
+export interface ShoppingItemQuote {
+  id: string;
+  supplierId?: string;
+  supplierName?: string;
+  precoUnitarioCents: number;
+  prazoEntregaDias?: number;
+  condicaoPagamento?: string;
+  vencedor?: boolean;
+}
+
+export interface ShoppingItemStatusHistory {
+  id: string;
+  deStatus?: string;
+  paraStatus: string;
+  data: string;
+  usuarioNome: string;
+}
+
 export interface ShoppingItem {
   id: string;
   userId: string;
   item: string;
+  categoria?: string;
+  unidade?: string;
+  quantidade?: number | string;
+  prioridade?: 'urgente' | 'normal' | 'programada';
+  dataNecessariaAte?: string;
+  fornecedorSugeridoId?: string;
+  fornecedorSugeridoNome?: string;
+  cotacoes?: ShoppingItemQuote[];
+  fornecedorVencedorId?: string;
+  fornecedorVencedorNome?: string;
+  valorUnitarioVencedorCents?: number;
+  projetoCentroCusto?: string;
+  observacoes?: string;
+  status?: 'aguardando_cotacao' | 'em_cotacao' | 'cotado' | 'aprovado' | 'convertido_pedido' | 'cancelado';
+  historicoStatus?: ShoppingItemStatusHistory[];
+  purchaseOrderId?: string;
+  purchaseOrderCodigo?: string;
   quantity?: string;
-  completed: boolean;
+  completed?: boolean;
   createdAt: string;
 }
 
