@@ -243,7 +243,14 @@ export interface Quotation {
   dataAbertura: string;
   dataLimite?: string;
   solicitanteId?: string;
+  solicitanteNome?: string;
+  fornecedorVencedorId?: string;
+  valorTotalFechadoCents?: number;
+  observacoes?: string;
+  shoppingItemId?: string;
   companyId?: string;
+  criadoEm?: string;
+  criadoPor?: string;
 }
 
 export interface QuotationItem {
@@ -258,10 +265,14 @@ export interface QuotationSupplierPrice {
   id: string;
   quotationId: string;
   supplierId: string;
-  productId: string;
+  productId?: string;
   precoUnitarioCents: number;
-  prazoEntregaDias: number;
+  valorFinalCents?: number;
+  prazoEntregaDias?: number;
+  prazoTexto?: string;
   condicaoPagamento?: string;
+  formaPagamento?: string;
+  observacao?: string;
   selecionado?: boolean;
 }
 

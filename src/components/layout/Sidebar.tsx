@@ -74,7 +74,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: <Boxes className="w-4 h-4 shrink-0" />,
           badgeCount: () => (db.products || []).filter(p => p.ativo && p.tipo_item === 'materia_prima').length
         },
-        { path: '/compras', label: 'Compras & RFQ', icon: <ShoppingCart className="w-4 h-4 shrink-0" /> },
+        {
+          path: '/compras',
+          label: 'Compras & RFQ',
+          icon: <ShoppingCart className="w-4 h-4 shrink-0" />,
+          badgeCount: () => (db.gescompShoppingList || []).filter(i => !i.completed && i.status !== 'convertido_pedido' && i.status !== 'cancelado').length
+        },
         { path: '/comercial', label: 'Comercial & Vendas', icon: <ShoppingBag className="w-4 h-4 shrink-0" /> }
       ]
     },
