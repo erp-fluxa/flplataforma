@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard, CheckSquare, Wrench,
   Boxes, ShoppingCart, ShoppingBag, Users,
-  Settings, ChevronLeft, ChevronRight
+  Settings, Trash2, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useDb } from '../../context/DbContext';
@@ -83,7 +83,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Cadastros & Sistema',
       items: [
         { path: '/cadastros', label: 'Central de Cadastros', icon: <Users className="w-4 h-4 shrink-0" /> },
-        { path: '/config', label: 'Configurações & Logos', icon: <Settings className="w-4 h-4 shrink-0" /> }
+        { path: '/config', label: 'Configurações & Logos', icon: <Settings className="w-4 h-4 shrink-0" /> },
+        {
+          path: '/lixeira',
+          label: 'Lixeira & Excluídos',
+          icon: <Trash2 className="w-4 h-4 shrink-0 text-rose-400" />,
+          badgeCount: () => (db.deletedItems || []).length
+        }
       ]
     }
   ];

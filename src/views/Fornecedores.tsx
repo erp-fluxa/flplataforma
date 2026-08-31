@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Truck, Plus, Eye, Edit, Trash2, Power, PowerOff } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Card, Button, Badge, Modal } from '../components/ui';
 import { uid } from '../lib/formatters';
 import { Supplier } from '../types';
@@ -9,6 +10,7 @@ import { Supplier } from '../types';
 export const Fornecedores: React.FC = () => {
   const { db, updateDb } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   const [modalNovoFornecedorOpen, setModalNovoFornecedorOpen] = useState(false);
   const [modalViewOpen, setModalViewOpen] = useState(false);
@@ -66,14 +68,29 @@ export const Fornecedores: React.FC = () => {
     alert(`Fornecedor ${f.razaoSocial} ${nextStatus ? 'ativado' : 'inativado'}!`);
   };
 
-  const handleDelete = async (f: Supplier) => {
-    if (confirm(`Tem certeza que deseja excluir o fornecedor ${f.razaoSocial}?`)) {
-      await updateDb(prev => ({
-        ...prev,
-        suppliers: prev.suppliers.filter(item => item.id !== f.id)
-      }), 'SUPPLIER_DELETED');
-      alert(`Fornecedor ${f.razaoSocial} excluído!`);
-    }
+  const handleDelete = (f: Supplier) => {
+    const pcCount = db.orders?.filter(o => o.supplierId === f.id).length || 0;
+    const deps: string[] = [];
+    if (pcCount > 0) deps.push(`Possui ${pcCount} pedido(s) de compra associado(s).`);
+
+    requestDelete({
+      title: 'Excluir Fornecedor',
+      itemName: f.nomeFantasia || f.razaoSocial,
+      itemType: 'Fornecedor',
+      entityType: 'supplier',
+      moduleKey: 'cadastros',
+      originalId: f.id,
+      itemData: f,
+      isSoftDelete: true,
+      dependencies: deps,
+      warningMessage: 'Ao confirmar, o fornecedor será movido para a lixeira.',
+      onDelete: async () => {
+        await updateDb(prev => ({
+          ...prev,
+          suppliers: prev.suppliers.filter(item => item.id !== f.id)
+        }), 'SUPPLIER_DELETED');
+      }
+    });
   };
 
   const handleCriarOuEditarFornecedor = async (e: React.FormEvent) => {

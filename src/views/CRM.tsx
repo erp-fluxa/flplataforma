@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Target, Plus, Phone, Mail, FileText, Send, CheckCircle, XCircle, ArrowRight, Eye, Edit, Trash2, Power, PowerOff } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Card, Button, Badge, Modal } from '../components/ui';
 import { fmtMoeda, fmtData, uid } from '../lib/formatters';
 import { SalesOrder, ProductionOrder } from '../types';
@@ -28,8 +29,9 @@ export interface Lead {
 }
 
 export const CRM: React.FC = () => {
-  const { db, updateDb } = useDb();
+  const { db, updateDb, processarVendaAutomatica } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   // Leads do DB ou estado padrão inicial
   const [leads, setLeads] = useState<Lead[]>(() => {
@@ -158,15 +160,29 @@ export const CRM: React.FC = () => {
     } as any), 'LEAD_STAGE_MOVED');
   };
 
-  const handleDeleteLead = async (leadId: string) => {
-    if (confirm('Deseja excluir esta oportunidade do funil comercial?')) {
-      const updated = leads.filter(l => l.id !== leadId);
-      setLeads(updated);
-      await updateDb(prev => ({
-        ...prev,
-        crmLeads: updated
-      } as any), 'LEAD_DELETED');
-    }
+  const handleDeleteLead = (leadId: string) => {
+    const targetLead = leads.find(l => l.id === leadId);
+    if (!targetLead) return;
+
+    requestDelete({
+      title: 'Excluir Oportunidade do Funil Comercial',
+      itemName: `${targetLead.nome} (${fmtMoeda(targetLead.valorEstimadoCents)})`,
+      itemType: 'Oportunidade Comercial',
+      entityType: 'customer',
+      moduleKey: 'vendas',
+      originalId: leadId,
+      itemData: targetLead,
+      isSoftDelete: true,
+      warningMessage: 'Ao confirmar, a oportunidade será movida para a lixeira.',
+      onDelete: async () => {
+        const updated = leads.filter(l => l.id !== leadId);
+        setLeads(updated);
+        await updateDb(prev => ({
+          ...prev,
+          crmLeads: updated
+        } as any), 'LEAD_DELETED');
+      }
+    });
   };
 
   const handleFecharNegocio = async (lead: Lead) => {

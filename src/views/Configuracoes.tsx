@@ -2,18 +2,21 @@ import React, { useState } from 'react';
 import { Settings, Image, User as UserIcon, Building2, Cloud, Upload, RefreshCw, CheckCircle, Trash2, Eye, Edit, Power, PowerOff, ShieldCheck, Mail, Lock, Key } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Button, Card, Badge, Modal } from '../components/ui';
 import { SITE_CONFIG } from '../config/site';
 import { CustomLogos, User, Company } from '../types';
 import { uid } from '../lib/formatters';
+import { Lixeira } from './Lixeira';
 
 export const Configuracoes: React.FC = () => {
   const { db, uploadLogo, resetLogos, updateDb, syncFromCloud, salvarEmpresa, excluirEmpresa, selecionarEmpresaAtiva } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   const isSuperAdmin = user?.roleId === 'super_admin' || user?.roleId === 'admin' || user?.role?.name?.toLowerCase().includes('admin') || user?.username === 'admin';
 
-  const [activeTab, setActiveTab] = useState<'visual' | 'usuarios' | 'empresa' | 'nuvem' | 'integracoes'>('visual');
+  const [activeTab, setActiveTab] = useState<'visual' | 'usuarios' | 'empresa' | 'nuvem' | 'integracoes' | 'lixeira'>('visual');
 
 
   // Modal Novo / Editar Usuário
@@ -105,7 +108,7 @@ export const Configuracoes: React.FC = () => {
     }), 'USER_STATUS_TOGGLED');
   };
 
-  const handleDeleteUser = async (userId: string) => {
+  const handleDeleteUser = (userId: string) => {
     if (!isSuperAdmin) {
       alert('Apenas o Super Admin tem permissão para excluir usuários.');
       return;
@@ -117,15 +120,26 @@ export const Configuracoes: React.FC = () => {
     }
 
     const target = db.users.find(u => u.id === userId);
-    const userName = target?.name || target?.username || 'Usuário';
+    if (!target) return;
+    const userName = target.name || target.username || 'Usuário';
 
-    if (confirm(`Tem certeza que deseja excluir o usuário "${userName}" (@${target?.username || ''})?\n\nEsta ação removerá o acesso do usuário do sistema.`)) {
-      await updateDb(prev => ({
-        ...prev,
-        users: (prev.users || []).filter(u => u.id !== userId)
-      }), 'USER_DELETED');
-      alert(`Usuário ${userName} excluído com sucesso!`);
-    }
+    requestDelete({
+      title: 'Excluir Usuário',
+      itemName: `${userName} (@${target.username})`,
+      itemType: 'Usuário',
+      entityType: 'user',
+      moduleKey: 'config',
+      originalId: target.id,
+      itemData: target,
+      isSoftDelete: true,
+      warningMessage: 'Ao confirmar, o usuário perderá o acesso ao sistema e será movido para a lixeira.',
+      onDelete: async () => {
+        await updateDb(prev => ({
+          ...prev,
+          users: (prev.users || []).filter(u => u.id !== userId)
+        }), 'USER_DELETED');
+      }
+    });
   };
 
   const handleOpenEditUser = (userToEdit: User) => {
@@ -196,7 +210,7 @@ export const Configuracoes: React.FC = () => {
     }
   };
 
-  const handleDeleteEmpresa = async (comp: Company) => {
+  const handleDeleteEmpresa = (comp: Company) => {
     if (!isSuperAdmin) {
       alert('Apenas o Super Admin tem permissão para excluir empresas do grupo.');
       return;
@@ -205,16 +219,24 @@ export const Configuracoes: React.FC = () => {
     const nomeEmpresa = comp.nomeFantasia || comp.razaoSocial || comp.nome || 'Empresa';
     const cnpjDisplay = comp.cnpj ? `[${comp.cnpj}] ` : '';
 
-    if (confirm(`Tem certeza que deseja excluir a empresa ${cnpjDisplay}${nomeEmpresa} do cadastro?\n\nEsta ação removerá a empresa do sistema.`)) {
-      const res = await excluirEmpresa(comp.id, user?.name || 'Super Admin');
-      if (res.success) {
-        alert(`Empresa ${nomeEmpresa} excluída com sucesso!`);
-      } else {
-        alert(res.error || 'Erro ao excluir empresa.');
+    requestDelete({
+      title: 'Excluir Empresa / Unidade',
+      itemName: `${cnpjDisplay}${nomeEmpresa}`,
+      itemType: 'Empresa',
+      entityType: 'company',
+      moduleKey: 'config',
+      originalId: comp.id,
+      itemData: comp,
+      isSoftDelete: true,
+      warningMessage: 'Ao confirmar, a empresa será movida para a lixeira.',
+      onDelete: async () => {
+        const res = await excluirEmpresa(comp.id, user?.name || 'Super Admin');
+        if (!res.success) {
+          throw new Error(res.error || 'Erro ao excluir empresa.');
+        }
       }
-    }
+    });
   };
-
 
   const handleSelectEmpresa = async (comp: Company) => {
     await selecionarEmpresaAtiva(comp.id);
@@ -254,6 +276,12 @@ export const Configuracoes: React.FC = () => {
           className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all ${activeTab === 'integracoes' ? 'bg-brand-700 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 hover:bg-slate-200'}`}
         >
           <Key className="w-3.5 h-3.5" /> 5. Parâmetros & Fiscais
+        </button>
+        <button
+          onClick={() => setActiveTab('lixeira')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all ${activeTab === 'lixeira' ? 'bg-rose-700 text-white shadow-sm' : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30'}`}
+        >
+          <Trash2 className="w-3.5 h-3.5" /> 6. Lixeira & Itens Excluídos
         </button>
       </div>
 
@@ -1195,6 +1223,11 @@ export const Configuracoes: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* ABA 6: LIXEIRA & ITENS EXCLUÍDOS RECENTEMENTE */}
+      {activeTab === 'lixeira' && (
+        <Lixeira />
+      )}
     </div>
   );
 };

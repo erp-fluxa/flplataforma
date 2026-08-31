@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FileSpreadsheet, Plus, CheckCircle, Eye, ShoppingCart, Trash2, Edit, Power, PowerOff, Building, Sparkles, PackagePlus, Scale, Award, Clock, DollarSign, ArrowRight, UserCheck } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Card, Button, Badge, Modal } from '../components/ui';
 import { fmtMoeda, fmtQtd, fmtData, uid } from '../lib/formatters';
 import { Quotation, QuotationItem, QuotationSupplierPrice, PurchaseOrder, Product, Supplier } from '../types';
@@ -21,6 +22,7 @@ export interface FornecedorComparacao {
 export const Cotacoes: React.FC = () => {
   const { db, updateDb } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   // Modais
   const [modalNovaCotacaoOpen, setModalNovaCotacaoOpen] = useState(false);
@@ -181,15 +183,30 @@ export const Cotacoes: React.FC = () => {
     alert(`Cotação ${cot.codigo} ${nextStatus === 'reprovada' ? 'inativada / cancelada' : 'reativada'}!`);
   };
 
-  const handleDelete = async (cot: Quotation) => {
-    if (confirm(`Tem certeza que deseja excluir a cotação ${cot.codigo}?`)) {
-      await updateDb(prev => ({
-        ...prev,
-        quotations: prev.quotations.filter(q => q.id !== cot.id),
-        quotationItems: (prev.quotationItems || []).filter(i => i.quotationId !== cot.id)
-      }), 'QUOTATION_DELETED');
-      alert(`Cotação ${cot.codigo} excluída!`);
-    }
+  const handleDelete = (cot: Quotation) => {
+    const itensCount = db.quotationItems?.filter(i => i.quotationId === cot.id).length || 0;
+    const deps: string[] = [];
+    if (itensCount > 0) deps.push(`Possui ${itensCount} item(ns) cotado(s) vinculados.`);
+
+    requestDelete({
+      title: 'Excluir Cotação / RFQ',
+      itemName: `Cotação ${cot.codigo} — ${cot.descricao}`,
+      itemType: 'Cotação',
+      entityType: 'quotation',
+      moduleKey: 'compras',
+      originalId: cot.id,
+      itemData: cot,
+      isSoftDelete: true,
+      dependencies: deps,
+      warningMessage: 'Ao confirmar, a cotação será movida para a lixeira.',
+      onDelete: async () => {
+        await updateDb(prev => ({
+          ...prev,
+          quotations: prev.quotations.filter(q => q.id !== cot.id),
+          quotationItems: (prev.quotationItems || []).filter(i => i.quotationId !== cot.id)
+        }), 'QUOTATION_DELETED');
+      }
+    });
   };
 
   const handleCriarOuEditarCotacao = async (e: React.FormEvent) => {

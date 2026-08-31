@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShoppingCart, Plus, CheckCircle, PackageCheck, Eye, Edit, Trash2, Power, PowerOff } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Card, Button, Badge, Modal } from '../components/ui';
 import { fmtMoeda, fmtData, uid } from '../lib/formatters';
 import { PurchaseOrder, StockMovement, StockBalance } from '../types';
@@ -9,6 +10,7 @@ import { PurchaseOrder, StockMovement, StockBalance } from '../types';
 export const PedidosCompra: React.FC = () => {
   const { db, updateDb } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   const [modalNovoPedidoOpen, setModalNovoPedidoOpen] = useState(false);
   const [modalViewOpen, setModalViewOpen] = useState(false);
@@ -51,14 +53,29 @@ export const PedidosCompra: React.FC = () => {
     alert(`Pedido ${ord.codigo} ${nextStatus === 'cancelado' ? 'cancelado / inativado' : 'reativado'}!`);
   };
 
-  const handleDelete = async (ord: PurchaseOrder) => {
-    if (confirm(`Tem certeza que deseja excluir a Ordem de Compra ${ord.codigo}?`)) {
-      await updateDb(prev => ({
-        ...prev,
-        orders: prev.orders.filter(o => o.id !== ord.id)
-      }), 'PURCHASE_ORDER_DELETED');
-      alert(`Pedido ${ord.codigo} excluído!`);
-    }
+  const handleDelete = (ord: PurchaseOrder) => {
+    const supplier = db.suppliers.find(s => s.id === ord.supplierId);
+    const deps: string[] = [];
+    if (supplier) deps.push(`Fornecedor: ${supplier.nomeFantasia || supplier.razaoSocial}`);
+
+    requestDelete({
+      title: 'Excluir Pedido de Compra',
+      itemName: `Pedido de Compra ${ord.codigo} (${fmtMoeda(ord.valorTotalCents)})`,
+      itemType: 'Pedido de Compra',
+      entityType: 'purchaseOrder',
+      moduleKey: 'compras',
+      originalId: ord.id,
+      itemData: ord,
+      isSoftDelete: true,
+      dependencies: deps,
+      warningMessage: 'Ao confirmar, o pedido de compra será movido para a lixeira.',
+      onDelete: async () => {
+        await updateDb(prev => ({
+          ...prev,
+          orders: prev.orders.filter(o => o.id !== ord.id)
+        }), 'PURCHASE_ORDER_DELETED');
+      }
+    });
   };
 
   const handleCriarOuEditarPedido = async (e: React.FormEvent) => {

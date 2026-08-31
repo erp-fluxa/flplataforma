@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShoppingCart, CheckSquare, Plus, Trash2, Check } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Button, Card, Badge } from '../components/ui';
 import { uid } from '../lib/formatters';
 import { FluxaTask } from '../types';
@@ -10,6 +11,7 @@ import { ListaCompras } from './ListaCompras';
 export const Tarefas: React.FC = () => {
   const { db, updateDb } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   const [activeTab, setActiveTab] = useState<'compras' | 'tarefas'>('compras');
   const [newTaskText, setNewTaskText] = useState('');
@@ -44,11 +46,24 @@ export const Tarefas: React.FC = () => {
     }), 'TASK_TOGGLED');
   };
 
-  const handleDeleteTask = async (taskId: string) => {
-    await updateDb(d => ({
-      ...d,
-      gescompTasks: (d.gescompTasks || []).filter(t => t.id !== taskId)
-    }), 'TASK_DELETED');
+  const handleDeleteTask = (task: FluxaTask) => {
+    requestDelete({
+      title: 'Excluir Tarefa',
+      itemName: task.text,
+      itemType: 'Tarefa',
+      entityType: 'shoppingItem',
+      moduleKey: 'tarefas',
+      originalId: task.id,
+      itemData: task,
+      isSoftDelete: true,
+      warningMessage: 'Ao confirmar, a tarefa será movida para a lixeira.',
+      onDelete: async () => {
+        await updateDb(d => ({
+          ...d,
+          gescompTasks: (d.gescompTasks || []).filter(t => t.id !== task.id)
+        }), 'TASK_DELETED');
+      }
+    });
   };
 
   return (
@@ -117,7 +132,7 @@ export const Tarefas: React.FC = () => {
                     <span className="font-medium text-slate-900 dark:text-white">{t.text}</span>
                   </div>
                   <button
-                    onClick={() => handleDeleteTask(t.id)}
+                    onClick={() => handleDeleteTask(t)}
                     className="p-1 rounded-lg text-slate-400 hover:text-rose-500 transition-colors"
                     title="Excluir Tarefa"
                   >

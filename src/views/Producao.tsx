@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Wrench, Plus, CheckCircle, Clock, AlertTriangle, Play, Eye, Edit, Trash2, Power, PowerOff, Layers, Cpu, Factory } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Card, Button, Badge, Modal } from '../components/ui';
 import { fmtData, fmtQtd, fmtMoeda, uid } from '../lib/formatters';
 import { ProductionOrder, StockMovement, StockBalance, WorkCenter, BOMVersion, BOMItem } from '../types';
@@ -15,6 +16,7 @@ interface ProducaoProps {
 export const Producao: React.FC<ProducaoProps> = ({ defaultTab = 'visao_geral' }) => {
   const { db, updateDb, excluirOpComEstorno } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   const [activeSubTab, setActiveSubTab] = useState<'visao_geral' | 'ops' | 'centros' | 'fichas'>(defaultTab);
 
@@ -66,15 +68,32 @@ export const Producao: React.FC<ProducaoProps> = ({ defaultTab = 'visao_geral' }
     alert(`Ordem de Produção ${op.codigo} ${isPausada ? 'retomada' : 'pausada / inativada'} com sucesso!`);
   };
 
-  const handleDelete = async (op: ProductionOrder) => {
-    if (confirm(`Tem certeza que deseja excluir a Ordem de Produção ${op.codigo}?\n\nEsta ação irá remover a OP e estornar/liberar automaticamente todas as reservas de matéria-prima e movimentações associadas.`)) {
-      const res = await excluirOpComEstorno(op.id, user?.name || 'PCP');
-      if (res.success) {
-        alert(res.detalhes || `Ordem de Produção ${op.codigo} excluída e reservas liberadas com sucesso!`);
-      } else {
-        alert(res.error || 'Erro ao excluir ordem de produção.');
-      }
+  const handleDelete = (op: ProductionOrder) => {
+    const deps: string[] = [
+      'Estorno e liberação automática de todas as reservas de matéria-prima e movimentações de estoque associadas a esta OP.'
+    ];
+    if (op.origemVendaCodigo) {
+      deps.push(`Esta OP foi gerada automaticamente pelo Pedido de Venda ${op.origemVendaCodigo}.`);
     }
+
+    requestDelete({
+      title: 'Excluir Ordem de Produção',
+      itemName: `OP ${op.codigo} — ${op.quantidadePlanejada} ${op.produtoAcabadoNome || 'Unidade(s)'}`,
+      itemType: 'Ordem de Produção',
+      entityType: 'productionOrder',
+      moduleKey: 'producao',
+      originalId: op.id,
+      itemData: op,
+      isSoftDelete: true,
+      dependencies: deps,
+      warningMessage: 'Ao confirmar, a OP será cancelada e movida para a lixeira.',
+      onDelete: async () => {
+        const res = await excluirOpComEstorno(op.id, user?.name || 'PCP');
+        if (!res.success) {
+          throw new Error(res.error || 'Erro ao excluir ordem de produção.');
+        }
+      }
+    });
   };
 
   const handleCriarOuEditarOp = async (e: React.FormEvent) => {

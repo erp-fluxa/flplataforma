@@ -1,13 +1,15 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Tag, Plus, Edit, Trash2, Search, Filter, Layers, Box } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Button, Card, Badge, Modal } from '../components/ui';
 import { MaterialCategory } from '../types';
 
 export const Categorias: React.FC = () => {
   const { db, salvarCategoria, excluirCategoria } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipo, setFilterTipo] = useState<string>('todos');
@@ -58,20 +60,28 @@ export const Categorias: React.FC = () => {
     }
   };
 
-  const handleDelete = async (cat: MaterialCategory) => {
+  const handleDelete = (cat: MaterialCategory) => {
     const vinculados = db.products.filter(p => p.categoria === cat.nome).length;
-    let aviso = '';
-    if (vinculados > 0) {
-      aviso = `\n\n⚠️ Existem ${vinculados} produto(s) ou insumo(s) vinculados a esta categoria.`;
-    }
-    if (confirm(`Deseja realmente excluir a categoria "${cat.nome}"?${aviso}`)) {
-      const res = await excluirCategoria(cat.id, user?.name || 'Admin');
-      if (res.success) {
-        alert('Categoria excluída com sucesso!');
-      } else {
-        alert(res.error || 'Erro ao excluir categoria.');
+    const deps = vinculados > 0 ? [`Existem ${vinculados} produto(s) ou insumo(s) vinculados a esta categoria.`] : [];
+
+    requestDelete({
+      title: 'Excluir Categoria',
+      itemName: cat.nome,
+      itemType: 'Categoria',
+      entityType: 'category',
+      moduleKey: 'cadastros',
+      originalId: cat.id,
+      itemData: cat,
+      isSoftDelete: true,
+      dependencies: deps,
+      warningMessage: 'Ao confirmar, a categoria será movida para a lixeira.',
+      onDelete: async () => {
+        const res = await excluirCategoria(cat.id, user?.name || 'Admin');
+        if (!res.success) {
+          throw new Error(res.error || 'Erro ao excluir categoria.');
+        }
       }
-    }
+    });
   };
 
   return (

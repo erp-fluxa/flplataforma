@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Layers, Plus, Trash2, Edit, Eye, Power, PowerOff, CheckCircle } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Card, Button, Badge, Modal } from '../components/ui';
 import { fmtQtd, uid } from '../lib/formatters';
 import { BOMVersion, BOMItem } from '../types';
@@ -9,6 +10,7 @@ import { BOMVersion, BOMItem } from '../types';
 export const FichasTecnicas: React.FC = () => {
   const { db, updateDb } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   const [modalNovaBomOpen, setModalNovaBomOpen] = useState(false);
   const [modalNovoItemOpen, setModalNovoItemOpen] = useState(false);
@@ -29,6 +31,7 @@ export const FichasTecnicas: React.FC = () => {
 
   const handleOpenNew = () => {
     setEditingBomId(null);
+    setSelectedProdId(db.products.find(p => p.tipo_item === 'produto_acabado')?.id || '');
     setVersaoNome('v1.0 (Ativa)');
     setVersaoDesc('');
     setModalNovaBomOpen(true);
@@ -59,15 +62,31 @@ export const FichasTecnicas: React.FC = () => {
     alert(`Ficha Técnica ${bom.versao} ${nextStatus === 'obsoleta' ? 'inativada / obsoleta' : 'ativada'}!`);
   };
 
-  const handleDeleteBom = async (bom: BOMVersion) => {
-    if (confirm(`Tem certeza que deseja excluir a Ficha Técnica ${bom.versao}?`)) {
-      await updateDb(prev => ({
-        ...prev,
-        bomVersions: prev.bomVersions.filter(b => b.id !== bom.id),
-        bomItems: (prev.bomItems || []).filter(i => i.bomVersionId !== bom.id)
-      }), 'BOM_DELETED');
-      alert('Ficha Técnica excluída!');
-    }
+  const handleDeleteBom = (bom: BOMVersion) => {
+    const prod = db.products.find(p => p.id === bom.productId);
+    const itensCount = (db.bomItems || []).filter(i => i.bomVersionId === bom.id).length;
+    const deps: string[] = [];
+    if (itensCount > 0) deps.push(`Possui ${itensCount} componente(s) estruturado(s) nesta versão.`);
+
+    requestDelete({
+      title: 'Excluir Ficha Técnica (BOM)',
+      itemName: `Ficha ${bom.versao} — ${prod?.descricao || 'Produto'}`,
+      itemType: 'Ficha Técnica',
+      entityType: 'bomVersion',
+      moduleKey: 'producao',
+      originalId: bom.id,
+      itemData: bom,
+      isSoftDelete: true,
+      dependencies: deps,
+      warningMessage: 'Ao confirmar, a ficha técnica será movida para a lixeira.',
+      onDelete: async () => {
+        await updateDb(prev => ({
+          ...prev,
+          bomVersions: prev.bomVersions.filter(b => b.id !== bom.id),
+          bomItems: (prev.bomItems || []).filter(i => i.bomVersionId !== bom.id)
+        }), 'BOM_DELETED');
+      }
+    });
   };
 
   const handleCriarOuEditarBom = async (e: React.FormEvent) => {

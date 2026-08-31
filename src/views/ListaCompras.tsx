@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Button, Card, Badge, Modal } from '../components/ui';
 import { fmtMoeda, fmtData, uid } from '../lib/formatters';
 import { ShoppingItem, ShoppingItemQuote, ShoppingItemStatusHistory, PurchaseOrder } from '../types';
@@ -42,6 +43,7 @@ const PROJETOS_CENTROS_CUSTO = [
 export const ListaCompras: React.FC = () => {
   const { db, updateDb } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   // Estados de Filtro e Busca
   const [searchTerm, setSearchTerm] = useState('');
@@ -300,13 +302,33 @@ export const ListaCompras: React.FC = () => {
   };
 
   // Excluir Item
-  const handleDeleteItem = async (itemId: string, nomeItem: string) => {
-    if (confirm(`Tem certeza que deseja excluir o item "${nomeItem}" da lista?`)) {
-      await updateDb(prev => ({
-        ...prev,
-        gescompShoppingList: (prev.gescompShoppingList || []).filter(i => i.id !== itemId)
-      }), 'SHOPPING_ITEM_DELETED');
+  const handleDeleteItem = (itemId: string, nomeItem: string) => {
+    const item = db.gescompShoppingList?.find(i => i.id === itemId);
+    if (!item) return;
+
+    const deps: string[] = [];
+    if (item.cotacoes && item.cotacoes.length > 0) {
+      deps.push(`Possui ${item.cotacoes.length} cotação(ões) de fornecedores vinculada(s).`);
     }
+
+    requestDelete({
+      title: 'Excluir Item da Lista de Compras',
+      itemName: `${nomeItem} (${item.quantidade} ${item.unidade})`,
+      itemType: 'Item de Compras',
+      entityType: 'shoppingItem',
+      moduleKey: 'compras',
+      originalId: itemId,
+      itemData: item,
+      isSoftDelete: true,
+      dependencies: deps,
+      warningMessage: 'Ao confirmar, o item será movido para a lixeira.',
+      onDelete: async () => {
+        await updateDb(prev => ({
+          ...prev,
+          gescompShoppingList: (prev.gescompShoppingList || []).filter(i => i.id !== itemId)
+        }), 'SHOPPING_ITEM_DELETED');
+      }
+    });
   };
 
   // Alteração Rápida de Status

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Users, Plus, Phone, Mail, MapPin, Eye, Edit, Trash2, Power, PowerOff, Building } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Card, Button, Badge, Modal } from '../components/ui';
 import { uid } from '../lib/formatters';
 import { Customer } from '../types';
@@ -9,6 +10,7 @@ import { Customer } from '../types';
 export const Clientes: React.FC = () => {
   const { db, updateDb } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   const [modalNovoClienteOpen, setModalNovoClienteOpen] = useState(false);
   const [modalViewOpen, setModalViewOpen] = useState(false);
@@ -63,14 +65,31 @@ export const Clientes: React.FC = () => {
     alert(`Cliente ${c.nome} ${nextStatus ? 'ativado' : 'inativado'}!`);
   };
 
-  const handleDelete = async (c: Customer) => {
-    if (confirm(`Tem certeza que deseja excluir o cliente ${c.nome}?`)) {
-      await updateDb(prev => ({
-        ...prev,
-        customers: prev.customers.filter(item => item.id !== c.id)
-      }), 'CUSTOMER_DELETED');
-      alert(`Cliente ${c.nome} excluído!`);
-    }
+  const handleDelete = (c: Customer) => {
+    const vendasCount = db.salesOrders?.filter(v => v.customerId === c.id).length || 0;
+    const crmCount = (db as any).crmLeads?.filter((l: any) => l.customerId === c.id).length || 0;
+    const deps: string[] = [];
+    if (vendasCount > 0) deps.push(`Possui ${vendasCount} pedido(s) de venda vinculado(s).`);
+    if (crmCount > 0) deps.push(`Possui ${crmCount} oportunidade(s) no CRM.`);
+
+    requestDelete({
+      title: 'Excluir Cliente',
+      itemName: c.nome,
+      itemType: 'Cliente',
+      entityType: 'customer',
+      moduleKey: 'cadastros',
+      originalId: c.id,
+      itemData: c,
+      isSoftDelete: true,
+      dependencies: deps,
+      warningMessage: 'Ao confirmar, o cliente será movido para a lixeira.',
+      onDelete: async () => {
+        await updateDb(prev => ({
+          ...prev,
+          customers: prev.customers.filter(item => item.id !== c.id)
+        }), 'CUSTOMER_DELETED');
+      }
+    });
   };
 
   const handleCriarOuEditarCliente = async (e: React.FormEvent) => {

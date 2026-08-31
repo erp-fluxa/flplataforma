@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Cpu, Plus, CheckCircle, Eye, Edit, Trash2, Power, PowerOff } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Card, Button, Badge, Modal } from '../components/ui';
 import { fmtMoeda, uid } from '../lib/formatters';
 import { WorkCenter } from '../types';
@@ -9,6 +10,7 @@ import { WorkCenter } from '../types';
 export const CentrosTrabalho: React.FC = () => {
   const { db, updateDb } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   const [modalNovoCentroOpen, setModalNovoCentroOpen] = useState(false);
   const [modalViewOpen, setModalViewOpen] = useState(false);
@@ -57,14 +59,24 @@ export const CentrosTrabalho: React.FC = () => {
     alert(`Centro de Trabalho ${wc.nome} ${nextStatus ? 'ativado' : 'inativado'}!`);
   };
 
-  const handleDelete = async (wc: WorkCenter) => {
-    if (confirm(`Tem certeza que deseja excluir o Centro de Trabalho ${wc.nome}?`)) {
-      await updateDb(prev => ({
-        ...prev,
-        workCenters: prev.workCenters.filter(item => item.id !== wc.id)
-      }), 'WORK_CENTER_DELETED');
-      alert(`Centro ${wc.nome} excluído!`);
-    }
+  const handleDelete = (wc: WorkCenter) => {
+    requestDelete({
+      title: 'Excluir Centro de Trabalho',
+      itemName: `[${wc.codigo}] ${wc.nome}`,
+      itemType: 'Centro de Trabalho',
+      entityType: 'workCenter',
+      moduleKey: 'producao',
+      originalId: wc.id,
+      itemData: wc,
+      isSoftDelete: true,
+      warningMessage: 'Ao confirmar, o centro de trabalho será movido para a lixeira.',
+      onDelete: async () => {
+        await updateDb(prev => ({
+          ...prev,
+          workCenters: prev.workCenters.filter(item => item.id !== wc.id)
+        }), 'WORK_CENTER_DELETED');
+      }
+    });
   };
 
   const handleCriarOuEditarCentro = async (e: React.FormEvent) => {

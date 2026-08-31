@@ -384,6 +384,24 @@ export interface CustomLogos {
   _v?: number | string;
 }
 
+export interface DeletedItemRecord {
+  id: string;
+  originalId: string;
+  entityType: 'product' | 'category' | 'company' | 'user' | 'customer' | 'supplier' | 'salesOrder' | 'productionOrder' | 'quotation' | 'purchaseOrder' | 'shoppingItem' | 'workCenter' | 'warehouse' | 'bomVersion';
+  entityName: string;
+  entityCode?: string;
+  data: any;
+  deletedAt: string;
+  deletedBy: {
+    id: string;
+    name: string;
+  };
+  retentionDays?: number;
+  isSoftDelete: boolean;
+  moduleKey: 'estoque' | 'cadastros' | 'compras' | 'vendas' | 'producao' | 'config' | 'tarefas';
+  reason?: string;
+}
+
 export interface DatabaseState {
   company: Company;
   companies: Company[];
@@ -411,6 +429,7 @@ export interface DatabaseState {
   salesOrders: SalesOrder[];
   gescompTasks: FluxaTask[];
   gescompShoppingList: ShoppingItem[];
+  deletedItems?: DeletedItemRecord[];
   auditLogs: AuditLog[];
   userPermissionOverrides?: Record<string, Record<string, boolean>>;
   customNavLabels?: Record<string, string>;

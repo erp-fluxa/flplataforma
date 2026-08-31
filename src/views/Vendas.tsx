@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShoppingBag, Plus, Wrench, CheckCircle, Eye, Edit, Trash2, Power, PowerOff, Package, AlertTriangle, ArrowRight, Layers, FileText } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Card, Button, Badge, Modal } from '../components/ui';
 import { fmtMoeda, fmtData, uid } from '../lib/formatters';
 import { SalesOrder, ProductionOrder } from '../types';
@@ -9,6 +10,7 @@ import { SalesOrder, ProductionOrder } from '../types';
 export const Vendas: React.FC = () => {
   const { db, updateDb, processarVendaAutomatica, excluirVendaComEstorno } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   const [modalNovoPedidoOpen, setModalNovoPedidoOpen] = useState(false);
   const [modalViewOpen, setModalViewOpen] = useState(false);
@@ -81,15 +83,33 @@ export const Vendas: React.FC = () => {
     alert(`Pedido de Venda ${pv.codigo} ${nextStatus === 'cancelado' ? 'cancelado / inativado' : 'reativado'}!`);
   };
 
-  const handleDelete = async (pv: SalesOrder) => {
-    if (confirm(`Tem certeza que deseja excluir o Pedido de Venda ${pv.codigo}?\n\nEsta ação irá remover a venda, excluir as Ordens de Produção vinculadas e estornar/liberar automaticamente todas as reservas e baixas de estoque.`)) {
-      const res = await excluirVendaComEstorno(pv.id, user?.name || 'Vendedor');
-      if (res.success) {
-        alert(res.detalhes || `Pedido de Venda ${pv.codigo} excluído e estoque estornado com sucesso!`);
-      } else {
-        alert(res.error || 'Erro ao excluir pedido de venda.');
-      }
+  const handleDelete = (pv: SalesOrder) => {
+    const opsVinculadas = db.productionOrders?.filter(o => o.origemVendaId === pv.id || o.salesOrderId === pv.id).length || 0;
+    const deps: string[] = [
+      'Estorno/liberação automática de todas as reservas e movimentações de estoque associadas.'
+    ];
+    if (opsVinculadas > 0) {
+      deps.push(`Exclusão em cascata de ${opsVinculadas} Ordem(ns) de Produção geradas por esta venda.`);
     }
+
+    requestDelete({
+      title: 'Excluir Pedido de Venda',
+      itemName: `Pedido ${pv.codigo} (${fmtMoeda(pv.valorTotalCents)})`,
+      itemType: 'Pedido de Venda',
+      entityType: 'salesOrder',
+      moduleKey: 'vendas',
+      originalId: pv.id,
+      itemData: pv,
+      isSoftDelete: true,
+      dependencies: deps,
+      warningMessage: 'Ao confirmar, a venda será cancelada e movida para a lixeira.',
+      onDelete: async () => {
+        const res = await excluirVendaComEstorno(pv.id, user?.name || 'Vendedor');
+        if (!res.success) {
+          throw new Error(res.error || 'Erro ao excluir pedido de venda.');
+        }
+      }
+    });
   };
 
   const handleSubmitVenda = async (e: React.FormEvent) => {

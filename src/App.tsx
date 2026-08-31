@@ -17,6 +17,7 @@ import { Fornecedores } from './views/Fornecedores';
 import { Depositos } from './views/Depositos';
 import { FichasTecnicas } from './views/FichasTecnicas';
 import { CentrosTrabalho } from './views/CentrosTrabalho';
+import { Lixeira } from './views/Lixeira';
 
 export const App: React.FC = () => {
   const { user } = useAuth();
@@ -84,6 +85,8 @@ export const App: React.FC = () => {
         return <Comercial defaultTab="crm" />;
       case '/vendas':
         return <Comercial defaultTab="vendas" />;
+      case '/lixeira':
+        return <Lixeira />;
       default:
         return <Dashboard onNavigate={navigate} />;
     }
@@ -94,6 +97,7 @@ export const App: React.FC = () => {
       case '/': return 'Painel Geral & Indicadores';
       case '/estoque': return 'Gestão de Estoque & Saldos Físicos';
       case '/config': return 'Configurações do Sistema & Identidade Visual';
+      case '/lixeira': return 'Lixeira & Itens Excluídos Recentemente';
       case '/tarefas': return 'Tarefas & Lista de Compras';
       case '/compras': return 'Gestão de Compras & Suprimentos';
       case '/cotacoes': return 'Cotações de Preço & RFQ';

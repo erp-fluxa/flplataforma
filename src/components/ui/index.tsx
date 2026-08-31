@@ -86,4 +86,6 @@ export const Badge: React.FC<{ children: React.ReactNode; variant?: 'success' | 
 };
 
 export * from './Modal';
+export * from './ConfirmDeleteModal';
+export * from './UndoToast';
 

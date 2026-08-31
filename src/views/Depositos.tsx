@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Warehouse, Plus, MapPin, Eye, Edit, Trash2, Power, PowerOff } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Card, Button, Badge, Modal } from '../components/ui';
 import { uid } from '../lib/formatters';
 import { Warehouse as WarehouseType, Location } from '../types';
@@ -9,6 +10,7 @@ import { Warehouse as WarehouseType, Location } from '../types';
 export const Depositos: React.FC = () => {
   const { db, updateDb } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   const [modalNovoDepositoOpen, setModalNovoDepositoOpen] = useState(false);
   const [modalViewOpen, setModalViewOpen] = useState(false);
@@ -31,7 +33,7 @@ export const Depositos: React.FC = () => {
     setEditingDepositoId(w.id);
     setCodigo(w.codigo);
     setNome(w.nome);
-    setTipo(w.tipo);
+    setTipo(w.tipo || 'materia_prima');
     setModalNovoDepositoOpen(true);
   };
 
@@ -51,14 +53,24 @@ export const Depositos: React.FC = () => {
     alert(`Depósito ${w.nome} ${nextStatus ? 'ativado' : 'inativado'}!`);
   };
 
-  const handleDelete = async (w: WarehouseType) => {
-    if (confirm(`Tem certeza que deseja excluir o Depósito ${w.nome}?`)) {
-      await updateDb(prev => ({
-        ...prev,
-        warehouses: prev.warehouses.filter(item => item.id !== w.id)
-      }), 'WAREHOUSE_DELETED');
-      alert(`Depósito ${w.nome} excluído!`);
-    }
+  const handleDelete = (w: WarehouseType) => {
+    requestDelete({
+      title: 'Excluir Depósito / Almoxarifado',
+      itemName: `[${w.codigo}] ${w.nome}`,
+      itemType: 'Depósito',
+      entityType: 'warehouse',
+      moduleKey: 'estoque',
+      originalId: w.id,
+      itemData: w,
+      isSoftDelete: true,
+      warningMessage: 'Ao confirmar, o depósito será movido para a lixeira.',
+      onDelete: async () => {
+        await updateDb(prev => ({
+          ...prev,
+          warehouses: prev.warehouses.filter(item => item.id !== w.id)
+        }), 'WAREHOUSE_DELETED');
+      }
+    });
   };
 
   const handleCriarOuEditarDeposito = async (e: React.FormEvent) => {

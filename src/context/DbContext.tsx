@@ -93,6 +93,7 @@ function deepMergeDbState(base: DatabaseState, userState: Partial<DatabaseState>
     salesOrders: mergeArrayById(base.salesOrders || [], userState.salesOrders || []),
     gescompTasks: mergeArrayById(base.gescompTasks || [], userState.gescompTasks || []),
     gescompShoppingList: mergeArrayById(base.gescompShoppingList || [], userState.gescompShoppingList || []),
+    deletedItems: mergeArrayById(base.deletedItems || [], userState.deletedItems || []),
     auditLogs: mergeArrayById(base.auditLogs || [], userState.auditLogs || []),
     stockBalances: Array.isArray(userState.stockBalances) ? userState.stockBalances : base.stockBalances,
     stockMovements: Array.isArray(userState.stockMovements) ? userState.stockMovements : base.stockMovements,

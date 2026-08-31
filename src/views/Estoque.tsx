@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Boxes, Plus, Trash2, Edit, Eye, Power, PowerOff, Search, Filter, AlertTriangle, ShieldCheck, Tag, Layers, Package } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
+import { useDelete } from '../context/DeleteContext';
 import { Button, Card, Badge, Modal } from '../components/ui';
 import { fmtMoeda, fmtQtd, fmtData, uid } from '../lib/formatters';
 import { Product, MaterialCategory } from '../types';
@@ -9,6 +10,7 @@ import { Product, MaterialCategory } from '../types';
 export const Estoque: React.FC = () => {
   const { db, updateDb, salvarProduto, excluirProduto, zerarSaldosEstoque, reconciliarEstoque, salvarCategoria, excluirCategoria } = useDb();
   const { user } = useAuth();
+  const { requestDelete } = useDelete();
 
   const [activeTab, setActiveTab] = useState<'mp' | 'muc' | 'pa' | 'separacao'>('mp');
   const [searchTerm, setSearchTerm] = useState('');
@@ -79,15 +81,35 @@ export const Estoque: React.FC = () => {
     }
   };
 
-  const handleDeleteProduct = async (prod: Product) => {
-    if (confirm(`Tem certeza que deseja excluir o produto [${prod.codigo}] ${prod.descricao}? Esta ação não pode ser desfeita.`)) {
-      const res = await excluirProduto(prod.id, user?.name || 'Admin');
-      if (res.success) {
-        alert(`Produto [${prod.codigo}] excluído com sucesso!`);
-      } else {
-        alert(res.error || 'Erro ao excluir produto.');
-      }
+  const handleDeleteProduct = (prod: Product) => {
+    const deps: string[] = [];
+    const saldo = db.stockBalances?.find(b => b.productId === prod.id);
+    if (saldo && saldo.saldoFisico !== 0) {
+      deps.push(`Saldo Físico atual no estoque: ${saldo.saldoFisico} ${prod.unidadeMedida}`);
     }
+    const temBOM = db.bomItems?.some(b => b.componentId === prod.id);
+    if (temBOM) {
+      deps.push('Este item é componente em uma ou mais Fichas Técnicas ativas.');
+    }
+
+    requestDelete({
+      title: 'Excluir Produto / Insumo',
+      itemName: `[${prod.codigo}] ${prod.descricao}`,
+      itemType: 'Produto',
+      entityType: 'product',
+      moduleKey: 'estoque',
+      originalId: prod.id,
+      itemData: prod,
+      isSoftDelete: true,
+      dependencies: deps,
+      warningMessage: 'Ao confirmar, o item será movido para a lixeira e você poderá desfazê-lo imediatamente.',
+      onDelete: async () => {
+        const res = await excluirProduto(prod.id, user?.name || 'Admin');
+        if (!res.success) {
+          throw new Error(res.error || 'Erro ao excluir produto.');
+        }
+      }
+    });
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -150,20 +172,28 @@ export const Estoque: React.FC = () => {
     }
   };
 
-  const handleDeleteCategoria = async (cat: MaterialCategory) => {
+  const handleDeleteCategoria = (cat: MaterialCategory) => {
     const vinculados = db.products.filter(p => p.categoria === cat.nome).length;
-    let aviso = '';
-    if (vinculados > 0) {
-      aviso = `\n\n⚠️ Existem ${vinculados} produto(s) vinculados a esta categoria.`;
-    }
-    if (confirm(`Deseja realmente excluir a categoria "${cat.nome}"?${aviso}`)) {
-      const res = await excluirCategoria(cat.id, user?.name || 'Admin');
-      if (res.success) {
-        alert('Categoria excluída com sucesso!');
-      } else {
-        alert(res.error || 'Erro ao excluir categoria.');
+    const deps = vinculados > 0 ? [`Existem ${vinculados} produto(s) ou insumo(s) vinculados a esta categoria.`] : [];
+
+    requestDelete({
+      title: 'Excluir Categoria de Material',
+      itemName: cat.nome,
+      itemType: 'Categoria',
+      entityType: 'category',
+      moduleKey: 'estoque',
+      originalId: cat.id,
+      itemData: cat,
+      isSoftDelete: true,
+      dependencies: deps,
+      warningMessage: 'Ao confirmar, a categoria será movida para a lixeira.',
+      onDelete: async () => {
+        const res = await excluirCategoria(cat.id, user?.name || 'Admin');
+        if (!res.success) {
+          throw new Error(res.error || 'Erro ao excluir categoria.');
+        }
       }
-    }
+    });
   };
 
   // Lista unificada de categorias
