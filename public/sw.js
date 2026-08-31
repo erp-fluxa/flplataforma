@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fluxa-erp-v9';
+const CACHE_NAME = 'fluxa-erp-v11';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();

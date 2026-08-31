@@ -182,7 +182,120 @@ export const INITIAL_DATABASE: DatabaseState = {
   orders: [],
   salesOrders: [],
   gescompTasks: [],
-  gescompShoppingList: [],
+  gescompShoppingList: [
+    {
+      id: 'shop-01',
+      userId: 'usr-admin',
+      item: 'Perfil Guia U 90mm Galvanizado Steel Frame 3m',
+      categoria: 'Steel Frame / Estruturas',
+      unidade: 'M',
+      quantidade: 150,
+      prioridade: 'urgente',
+      dataNecessariaAte: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
+      fornecedorSugeridoId: 'for-2',
+      fornecedorSugeridoNome: 'Motion Tech / Aço Brasil',
+      projetoCentroCusto: 'PRJ-005 (Manutenção e Reformas)',
+      observacoes: 'Material em falta urgente para montagem da estrutura modular.',
+      status: 'aprovado',
+      cotacoes: [
+        {
+          id: 'q-01-1',
+          supplierId: 'for-2',
+          supplierName: 'Motion Tech / Aço Brasil',
+          precoUnitarioCents: 3850,
+          prazoEntregaDias: 2,
+          condicaoPagamento: '28 DDL',
+          vencedor: true
+        },
+        {
+          id: 'q-01-2',
+          supplierId: 'for-1',
+          supplierName: 'Filamentos & Metais Brasil',
+          precoUnitarioCents: 4200,
+          prazoEntregaDias: 5,
+          condicaoPagamento: '30 DDL',
+          vencedor: false
+        }
+      ],
+      fornecedorVencedorId: 'for-2',
+      fornecedorVencedorNome: 'Motion Tech / Aço Brasil',
+      valorUnitarioVencedorCents: 3850,
+      historicoStatus: [
+        {
+          id: 'h-01',
+          paraStatus: 'aguardando_cotacao',
+          data: new Date(Date.now() - 3 * 86400000).toISOString(),
+          usuarioNome: 'Eng. Marcelo'
+        },
+        {
+          id: 'h-02',
+          deStatus: 'aguardando_cotacao',
+          paraStatus: 'aprovado',
+          data: new Date().toISOString(),
+          usuarioNome: 'Super Admin'
+        }
+      ],
+      createdAt: new Date(Date.now() - 3 * 86400000).toISOString()
+    },
+    {
+      id: 'shop-02',
+      userId: 'usr-admin',
+      item: 'Lã de Vidro / Isolamento Termoacústico 50mm Rolo 12m²',
+      categoria: 'Isolamento Termoacústico',
+      unidade: 'M²',
+      quantidade: 80,
+      prioridade: 'normal',
+      dataNecessariaAte: new Date(Date.now() + 8 * 86400000).toISOString().split('T')[0],
+      fornecedorSugeridoId: 'for-1',
+      fornecedorSugeridoNome: '3D Filamentos & Suprimentos',
+      projetoCentroCusto: 'Matriz SC — Produção JP3D',
+      observacoes: 'Isolamento para cabines acústicas das impressoras industriais.',
+      status: 'em_cotacao',
+      cotacoes: [
+        {
+          id: 'q-02-1',
+          supplierId: 'for-1',
+          supplierName: '3D Filamentos & Suprimentos',
+          precoUnitarioCents: 2490,
+          prazoEntregaDias: 4,
+          condicaoPagamento: 'À Vista com Desconto',
+          vencedor: false
+        }
+      ],
+      historicoStatus: [
+        {
+          id: 'h-03',
+          paraStatus: 'em_cotacao',
+          data: new Date().toISOString(),
+          usuarioNome: 'Carlos Compras'
+        }
+      ],
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'shop-03',
+      userId: 'usr-admin',
+      item: 'Caixa de Parafusos Autoatarraxantes 4.2x13mm Ponta Broca (1.000 un)',
+      categoria: 'Fixadores & Parafusos (MUC)',
+      unidade: 'CX',
+      quantidade: 10,
+      prioridade: 'programada',
+      dataNecessariaAte: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+      projetoCentroCusto: 'Almoxarifado Central',
+      observacoes: 'Reposição de estoque de fixadores para o próximo mês.',
+      status: 'aguardando_cotacao',
+      cotacoes: [],
+      historicoStatus: [
+        {
+          id: 'h-04',
+          paraStatus: 'aguardando_cotacao',
+          data: new Date().toISOString(),
+          usuarioNome: 'Super Admin'
+        }
+      ],
+      createdAt: new Date().toISOString()
+    }
+  ],
   auditLogs: [
     {
       id: 'log-init',
