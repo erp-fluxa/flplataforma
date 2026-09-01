@@ -49,9 +49,8 @@ export const Tarefas: React.FC = () => {
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-
->>>>>>> aae391d (feat(compras): dashboard de acao operacional, 5 secoes priorizadas e correcoes de exclusao)
   // 1. Minhas Tarefas Operacionais
+
   const myTasks = (db.gescompTasks || []).filter(
     t => !t.userId || t.userId === user?.id || user?.permissoes?.includes('*') || user?.roleId === 'super_admin'
   );

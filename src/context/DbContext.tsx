@@ -47,16 +47,10 @@ const DbContext = createContext<DbContextType | null>(null);
 
 const STORAGE_KEYS = ['fluxa_db_v2', 'fluxa_erp_db', 'fluxa_local_db'];
 
-function mergeArrayById<T extends { id?: string }>(base: T[] = [], incoming: T[] = []): T[] {
-  const map = new Map<string, T>();
-  base.forEach(item => {
-    if (item?.id) map.set(item.id, item);
-  });
-  incoming.forEach(item => {
-    if (item?.id) map.set(item.id, item);
-  });
-  return Array.from(map.values());
-}
+// Identificador único da sessão/aba para filtrar eventos de eco
+const CLIENT_SESSION_ID = typeof window !== 'undefined'
+  ? ((window as any).__FLUXA_CLIENT_ID || ((window as any).__FLUXA_CLIENT_ID = 'tab_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now()))
+  : 'node_env';
 
 function deepMergeDbState(base: DatabaseState, userState: Partial<DatabaseState>): DatabaseState {
   if (!userState) return base;
@@ -67,10 +61,8 @@ function deepMergeDbState(base: DatabaseState, userState: Partial<DatabaseState>
       ...(base.company || {}),
       ...(userState.company || {})
     },
-    companies: Array.isArray(userState.companies) && userState.companies.length > 0
-      ? userState.companies
-      : (base.companies || []),
-    currentCompanyId: userState.currentCompanyId || base.currentCompanyId || 'emp-matriz',
+    companies: Array.isArray(userState.companies) ? userState.companies : (base.companies || []),
+    currentCompanyId: userState.currentCompanyId || base.currentCompanyId || 'comp-1',
     customLogos: {
       ...(base.customLogos || {}),
       ...(userState.customLogos || {})
@@ -79,12 +71,8 @@ function deepMergeDbState(base: DatabaseState, userState: Partial<DatabaseState>
       ...(base.systemSettings || {}),
       ...(userState.systemSettings || {})
     },
-    users: Array.isArray(userState.users) && userState.users.length > 0
-      ? mergeArrayById(base.users || [], userState.users || [])
-      : (base.users || []),
-    roles: Array.isArray(userState.roles) && userState.roles.length > 0
-      ? mergeArrayById(base.roles || [], userState.roles || [])
-      : (base.roles || []),
+    users: Array.isArray(userState.users) ? userState.users : (base.users || []),
+    roles: Array.isArray(userState.roles) ? userState.roles : (base.roles || []),
     customers: Array.isArray(userState.customers) ? userState.customers : (base.customers || []),
     suppliers: Array.isArray(userState.suppliers) ? userState.suppliers : (base.suppliers || []),
     products: Array.isArray(userState.products) ? userState.products : (base.products || []),
@@ -102,28 +90,42 @@ function deepMergeDbState(base: DatabaseState, userState: Partial<DatabaseState>
     deletedItems: Array.isArray(userState.deletedItems) ? userState.deletedItems : (base.deletedItems || []),
     auditLogs: Array.isArray(userState.auditLogs) ? userState.auditLogs : (base.auditLogs || []),
 
-    stockBalances: Array.isArray(userState.stockBalances) ? userState.stockBalances : base.stockBalances,
-    stockMovements: Array.isArray(userState.stockMovements) ? userState.stockMovements : base.stockMovements,
-    stockReservations: Array.isArray(userState.stockReservations) ? userState.stockReservations : base.stockReservations,
+    stockBalances: Array.isArray(userState.stockBalances) ? userState.stockBalances : (base.stockBalances || []),
+    stockMovements: Array.isArray(userState.stockMovements) ? userState.stockMovements : (base.stockMovements || []),
+    stockReservations: Array.isArray(userState.stockReservations) ? userState.stockReservations : (base.stockReservations || []),
     crmLeads: Array.isArray((userState as any).crmLeads) ? (userState as any).crmLeads : ((base as any).crmLeads || [])
   } as DatabaseState;
 }
-
 
 export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [db, setDb] = useState<DatabaseState>(() => {
     let loadedState: Partial<DatabaseState> | null = null;
 
-    for (const key of STORAGE_KEYS) {
+    // Prioridade 1: Chave principal v2
+    const savedV2 = safeLocalStorage.getItem('fluxa_db_v2');
+    if (savedV2) {
       try {
-        const saved = safeLocalStorage.getItem(key);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && typeof parsed === 'object') {
-            loadedState = loadedState ? deepMergeDbState(loadedState as DatabaseState, parsed) : parsed;
-          }
+        const parsed = JSON.parse(savedV2);
+        if (parsed && typeof parsed === 'object') {
+          loadedState = parsed;
         }
       } catch (_) {}
+    }
+
+    // Fallback apenas se v2 estiver vazio
+    if (!loadedState) {
+      for (const key of ['fluxa_erp_db', 'fluxa_local_db']) {
+        try {
+          const saved = safeLocalStorage.getItem(key);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && typeof parsed === 'object') {
+              loadedState = parsed;
+              break;
+            }
+          }
+        } catch (_) {}
+      }
     }
 
     if (loadedState) {
@@ -137,19 +139,33 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const [syncing, setSyncing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'syncing' | 'offline' | 'error'>('connecting');
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const realtimeChannelRef = React.useRef<any>(null);
-  const lastSyncTimestampRef = React.useRef<string>('');
 
-  const syncFromCloud = useCallback(async () => {
+  const realtimeChannelRef = React.useRef<any>(null);
+  const lastLocalSaveTimeRef = React.useRef<number>(0);
+  const lastSavedSyncIdRef = React.useRef<string>('');
+  const isLocalSavingRef = React.useRef<boolean>(false);
+  const debounceTimerRef = React.useRef<any>(null);
+  const pendingDbToSaveRef = React.useRef<DatabaseState | null>(null);
+
+  // Sincronização da Nuvem (Anti-Rollback com Verificação de Timestamp e ClientId)
+  const syncFromCloud = useCallback(async (isInitialLoad: boolean = false) => {
     const sb = getSupabase();
     if (!sb) {
-      setLoading(false);
+      if (isInitialLoad) setLoading(false);
       setConnectionStatus('offline');
       return;
     }
 
+    // Se houve edição local recente (menos de 2.5s), ignora sync para evitar sobrescrever a ação do usuário
+    if (!isInitialLoad && Date.now() - lastLocalSaveTimeRef.current < 2500) {
+      return;
+    }
+
     try {
-      setSyncing(true);
+      if (isInitialLoad) {
+        setSyncing(true);
+      }
+
       const { data, error } = await sb
         .from('system_backups')
         .select('*')
@@ -162,23 +178,39 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       } else {
         setConnectionStatus('connected');
         setConnectionError(null);
+
         if (Array.isArray(data) && data.length > 0 && data[0]?.dados) {
-          const cloudDb = data[0].dados;
-          const backupTimestamp = data[0].criado_em || new Date().toISOString();
+          const cloudPayload = data[0].dados;
+          const meta = cloudPayload?._clientMeta;
 
-          if (backupTimestamp !== lastSyncTimestampRef.current) {
-            lastSyncTimestampRef.current = backupTimestamp;
-            setDb(() => {
-              const merged = deepMergeDbState(INITIAL_DATABASE, cloudDb);
-              merged.lastBackup = backupTimestamp;
-
-              STORAGE_KEYS.forEach(key => {
-                safeLocalStorage.setItem(key, JSON.stringify(merged));
-              });
-
-              return merged;
-            });
+          // Se o backup veio desta mesma aba/sessão ou do mesmo syncId gravado localmente, descarta
+          if (meta?.clientId === CLIENT_SESSION_ID || (meta?.syncId && meta.syncId === lastSavedSyncIdRef.current)) {
+            return;
           }
+
+          // Se tiver timestamp e for mais antigo que a última alteração local, descarta
+          if (meta?.timestamp && meta.timestamp < lastLocalSaveTimeRef.current) {
+            return;
+          }
+
+          const backupTimestamp = data[0].criado_em || new Date().toISOString();
+          lastSavedSyncIdRef.current = meta?.syncId || backupTimestamp;
+
+          setDb(currentLocalDb => {
+            // Se local sofreu alteração mais recente que a nuvem, preserva local
+            if (!isInitialLoad && Date.now() - lastLocalSaveTimeRef.current < 2500) {
+              return currentLocalDb;
+            }
+
+            const merged = deepMergeDbState(INITIAL_DATABASE, cloudPayload);
+            merged.lastBackup = backupTimestamp;
+
+            STORAGE_KEYS.forEach(key => {
+              safeLocalStorage.setItem(key, JSON.stringify(merged));
+            });
+
+            return merged;
+          });
         }
       }
     } catch (e: any) {
@@ -186,67 +218,115 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       setConnectionStatus('offline');
       setConnectionError(e?.message || 'Falha de conexão / timeout');
     } finally {
-      setSyncing(false);
-      setLoading(false);
+      if (isInitialLoad) {
+        setSyncing(false);
+        setLoading(false);
+      }
     }
   }, []);
 
   const reconnect = useCallback(async () => {
     setConnectionStatus('connecting');
-    await syncFromCloud();
+    await syncFromCloud(true);
   }, [syncFromCloud]);
 
-  const persistAndBroadcast = useCallback(async (newDb: DatabaseState, actionName: string = 'STATE_SYNC') => {
-    const nowIso = new Date().toISOString();
-    lastSyncTimestampRef.current = nowIso;
+  // Gravação Real no Supabase com Metadados de Sessão
+  const flushCloudBackup = useCallback(async (stateToSave: DatabaseState, actionName: string = 'STATE_SYNC') => {
+    const sb = getSupabase();
+    if (!sb) return;
 
+    const syncId = uid('sync');
+    lastSavedSyncIdRef.current = syncId;
+    isLocalSavingRef.current = true;
+
+    try {
+      const payloadDados = {
+        ...stateToSave,
+        _clientMeta: {
+          clientId: CLIENT_SESSION_ID,
+          syncId: syncId,
+          timestamp: Date.now()
+        }
+      };
+
+      const { error } = await sb.from('system_backups').insert([{
+        versao: '2.0.0',
+        dados: payloadDados,
+        tipo: 'auto_sync'
+      }]);
+
+      if (error) {
+        setConnectionStatus('error');
+        setConnectionError(error.message);
+      } else {
+        setConnectionStatus('connected');
+        setConnectionError(null);
+      }
+    } catch (err: any) {
+      console.warn('[Supabase Backup Error]', err);
+      setConnectionStatus('offline');
+      setConnectionError(err?.message || 'Erro de conexão na sincronização');
+    } finally {
+      setTimeout(() => {
+        isLocalSavingRef.current = false;
+      }, 1000);
+    }
+  }, []);
+
+  // Fila Debounced para Persistência Cloud (Evita rajada de inserts concorrentes)
+  const queueCloudBackup = useCallback((stateToSave: DatabaseState, actionName: string = 'STATE_SYNC') => {
+    pendingDbToSaveRef.current = stateToSave;
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      if (pendingDbToSaveRef.current) {
+        flushCloudBackup(pendingDbToSaveRef.current, actionName);
+        pendingDbToSaveRef.current = null;
+      }
+    }, 250);
+  }, [flushCloudBackup]);
+
+  const persistAndBroadcast = useCallback((newDb: DatabaseState, actionName: string = 'STATE_SYNC') => {
+    lastLocalSaveTimeRef.current = Date.now();
+
+    // 1. Gravar imediatamente no safeLocalStorage (Sem espera de rede)
     STORAGE_KEYS.forEach(key => {
       safeLocalStorage.setItem(key, JSON.stringify(newDb));
     });
 
+    // 2. Broadcast para outras abas locais
     if (realtimeChannelRef.current) {
       try {
         realtimeChannelRef.current.send({
           type: 'broadcast',
           event: 'fluxa_sync',
-          payload: { action: actionName, timestamp: Date.now(), dados: newDb }
+          payload: {
+            clientId: CLIENT_SESSION_ID,
+            action: actionName,
+            timestamp: Date.now(),
+            dados: newDb
+          }
         });
       } catch (wsErr) {
         console.warn('[Realtime Broadcast Warn]', wsErr);
       }
     }
 
-    // 3. Persistir Snapshot no Banco de Dados Supabase
-    const sb = getSupabase();
-    if (sb) {
-      try {
-        const { error } = await sb.from('system_backups').insert([{
-          versao: '2.0.0',
-          dados: newDb,
-          tipo: 'auto_sync'
-        }]);
-        if (error) {
-          setConnectionStatus('error');
-          setConnectionError(error.message);
-        } else {
-          setConnectionStatus('connected');
-          setConnectionError(null);
-        }
-      } catch (err: any) {
-        console.warn('[Supabase Insert Error]', err);
-        setConnectionStatus('offline');
-        setConnectionError(err?.message || 'Erro de rede na persistência');
-      }
-    }
-  }, []);
+    // 3. Agendar gravação em nuvem com debounce para evitar tempestade de inserts concorrentes
+    queueCloudBackup(newDb, actionName);
+  }, [queueCloudBackup]);
 
   const updateDb = useCallback(async (updater: (prev: DatabaseState) => DatabaseState, actionName: string = 'DATA_UPDATED') => {
     setDb(prev => {
       const next = updater(prev);
-      persistAndBroadcast(next, actionName);
+      Promise.resolve().then(() => {
+        persistAndBroadcast(next, actionName);
+      });
       return next;
     });
   }, [persistAndBroadcast]);
+
 
   // SALVAR / CRIAR EMPRESA (Multi-CNPJ com Validação Rigorosa)
   const salvarEmpresa = useCallback(async (empresaData: Company, actorName: string): Promise<{ success: boolean; error?: string }> => {
@@ -1192,9 +1272,9 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
   // Subscrição WebSocket Realtime e Sincronização Contínua
   useEffect(() => {
-    syncFromCloud();
+    syncFromCloud(true);
 
-    // 1. Sincronização instantânea entre abas no mesmo computador/navegador
+    // 1. Sincronização instantânea entre abas no mesmo navegador
     const handleStorageChange = (e: StorageEvent) => {
       if (STORAGE_KEYS.includes(e.key || '') && e.newValue) {
         try {
@@ -1214,13 +1294,19 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     if (sb) {
       channel = sb.channel('fluxa_realtime_sync')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'system_backups' }, () => {
-          syncFromCloud();
+          // Se estamos nós mesmos salvando no momento ou acabamos de editar localmente, ignora o evento de eco
+          if (isLocalSavingRef.current || Date.now() - lastLocalSaveTimeRef.current < 2500) {
+            return;
+          }
+          syncFromCloud(false);
         })
         .on('broadcast', { event: 'fluxa_sync' }, (payload: any) => {
-          if (payload?.payload?.dados) {
-            const incomingDb = payload.payload.dados;
-            const ts = payload.payload.timestamp ? new Date(payload.payload.timestamp).toISOString() : new Date().toISOString();
-            lastSyncTimestampRef.current = ts;
+          const incomingMeta = payload?.payload;
+          if (incomingMeta?.clientId === CLIENT_SESSION_ID) {
+            return; // Nosso próprio broadcast descartado
+          }
+          if (incomingMeta?.dados) {
+            const incomingDb = incomingMeta.dados;
             setDb(() => {
               const merged = deepMergeDbState(INITIAL_DATABASE, incomingDb);
               STORAGE_KEYS.forEach(key => {
@@ -1229,7 +1315,7 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
               return merged;
             });
           } else {
-            syncFromCloud();
+            syncFromCloud(false);
           }
         })
         .subscribe((status: string) => {
@@ -1243,16 +1329,17 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         });
     }
 
-    // 3. Heartbeat de segurança a cada 5 segundos (garante recuperação instantânea em oscilações de rede)
+    // 3. Heartbeat de segurança a cada 15 segundos (silencioso, sem piscar a tela)
     const pollerInterval = setInterval(async () => {
       if (document.hidden) return;
+      if (isLocalSavingRef.current || Date.now() - lastLocalSaveTimeRef.current < 5000) return;
       const client = getSupabase();
       if (!client) return;
 
       try {
         const { data, error } = await client
           .from('system_backups')
-          .select('criado_em')
+          .select('id, criado_em')
           .order('criado_em', { ascending: false })
           .limit(1);
 
@@ -1261,14 +1348,14 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           setConnectionError(null);
         }
 
-        if (data && data[0]?.criado_em && data[0].criado_em !== lastSyncTimestampRef.current) {
-          syncFromCloud();
+        if (data && data[0]?.criado_em) {
+          syncFromCloud(false);
         }
       } catch (err: any) {
         setConnectionStatus('offline');
         setConnectionError(err?.message || 'Falha temporária de rede');
       }
-    }, 5000);
+    }, 15000);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
@@ -1279,6 +1366,7 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       }
     };
   }, [syncFromCloud]);
+
 
   return (
     <DbContext.Provider value={{
