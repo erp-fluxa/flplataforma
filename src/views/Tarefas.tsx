@@ -239,10 +239,30 @@ export const Tarefas: React.FC = () => {
             title="Lista de Compras & Suprimentos Rápidos"
             action={
               <span className="text-[11px] text-teal-400 font-bold">
-                Sincronizado com Compras & RFQ
+                Sincronizado com Compras &amp; RFQ
               </span>
             }
           >
+            {/* Banner de integração */}
+            <div className="mb-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-[11px] text-amber-300 font-semibold">
+              <ShoppingCart className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>
+                Itens adicionados aqui aparecem automaticamente em{' '}
+                <button
+                  type="button"
+                  className="underline font-black text-amber-400 hover:text-amber-300 cursor-pointer"
+                  onClick={() => {
+                    window.history.pushState({}, '', '/compras');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                    window.scrollTo(0, 0);
+                  }}
+                >
+                  Gestão de Compras &gt; Cotações &amp; RFQ
+                </button>
+                {' '}aguardando processamento.
+              </span>
+            </div>
+
             <form onSubmit={handleAddShoppingItem} className="flex gap-2 mb-4">
               <input
                 type="text"

@@ -65,9 +65,11 @@ export const Cotacoes: React.FC = () => {
   const [novoFornEmail, setNovoFornEmail] = useState('');
 
   // Itens da Lista de Compras Rápidas que estão PENDENTES de cotação
+  // Mostra TODOS os itens que ainda não foram cancelados ou convertidos em pedido,
+  // independente de 'completed' ou status — garante visibilidade total em Cotações & RFQ
   const pendingShoppingItems = useMemo(() => {
     return (db.gescompShoppingList || []).filter(
-      item => !item.completed && item.status !== 'convertido_pedido' && item.status !== 'cancelado'
+      item => item.status !== 'convertido_pedido' && item.status !== 'cancelado'
     );
   }, [db.gescompShoppingList]);
 
@@ -607,6 +609,71 @@ export const Cotacoes: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* ============================================================= */}
+      {/* BLOCO TOPO: ITENS DA LISTA DE COMPRAS RÁPIDA — SEMPRE VISÍVEL */}
+      {/* ============================================================= */}
+      {pendingShoppingItems.length > 0 && (
+        <div className="rounded-2xl border-2 border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-slate-900/60 to-slate-900/80 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center">
+                <ShoppingCart className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-sm text-amber-300 flex items-center gap-2">
+                  📋 Lista de Compras Rápidas — Aguardando Cotação
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950">
+                    {pendingShoppingItems.length}
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-400">Itens adicionados em "Tarefas &amp; Lista de Compras" que ainda não viraram cotação. Clique em "Transformar em Cotação" para processar.</p>
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-amber-500/20">
+            <table className="w-full text-xs">
+              <thead className="bg-amber-500/10 border-b border-amber-500/20 text-amber-300 uppercase font-bold">
+                <tr>
+                  <th className="px-3 py-2 text-left">Item Solicitado</th>
+                  <th className="px-3 py-2 text-left">Qtd</th>
+                  <th className="px-3 py-2 text-left">Prioridade</th>
+                  <th className="px-3 py-2 text-left">Fornecedor Sugerido</th>
+                  <th className="px-3 py-2 text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-500/10">
+                {pendingShoppingItems.map(item => (
+                  <tr key={item.id} className="hover:bg-amber-500/5 transition-colors">
+                    <td className="px-3 py-2">
+                      <span className="font-bold text-white">{item.item}</span>
+                      {item.observacoes && <span className="block text-[10px] text-slate-400">{item.observacoes}</span>}
+                    </td>
+                    <td className="px-3 py-2 font-mono font-bold text-slate-300">{item.quantidade || 1} {item.unidade || 'UN'}</td>
+                    <td className="px-3 py-2">
+                      <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] ${item.prioridade === 'urgente' ? 'bg-rose-500/20 text-rose-400' : item.prioridade === 'programada' ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                        {item.prioridade?.toUpperCase() || 'NORMAL'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-slate-400">{item.fornecedorSugeridoNome || 'Qualquer homologado'}</td>
+                    <td className="px-3 py-2 text-right">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={<Zap className="w-3 h-3" />}
+                        onClick={() => handleTransformQuickItemIntoQuote(item)}
+                        className="bg-amber-600 hover:bg-amber-500 font-bold text-[11px] px-2 py-1"
+                      >
+                        Transformar em Cotação
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* 1. CABEÇALHO PRINCIPAL COM AÇÕES RÁPIDAS */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
         <div>
