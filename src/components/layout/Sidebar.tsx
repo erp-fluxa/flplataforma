@@ -214,21 +214,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </nav>
 
-      {/* 3. Rodapé com Usuário e Botão de Recolher */}
-      <div className="p-3 border-t border-slate-200/60 dark:border-slate-800/80 shrink-0 space-y-2">
-        {!isCollapsed && (
-          <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl bg-slate-800/40 border border-slate-700/50 text-xs">
-            <div className="w-7 h-7 rounded-lg bg-teal-500/20 border border-teal-500/40 flex items-center justify-center font-bold text-teal-300 shrink-0 text-[11px]">
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className="block font-bold text-slate-200 truncate text-[11px]">{user?.name || 'Super Admin'}</span>
-              <span className="block text-[9.5px] text-teal-400 truncate font-mono">@{user?.username || 'admin'}</span>
-            </div>
-          </div>
-        )}
-
-        {!isMobile && (
+      {/* 3. Rodapé com Botão de Recolher */}
+      {!isMobile && (
+        <div className="p-3 border-t border-slate-200/60 dark:border-slate-800/80 shrink-0">
           <button
             onClick={toggleSidebar}
             className="w-full flex items-center justify-center gap-2 py-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors text-xs font-bold"
@@ -241,8 +229,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </>
             )}
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </aside>
+
   );
 };

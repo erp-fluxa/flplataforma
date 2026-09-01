@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, CheckSquare, Plus, Trash2, Check, ExternalLink, Clock, Tag, Smartphone, Share2, Copy, Bookmark, Sparkles, CheckCheck } from 'lucide-react';
+import { 
+  ShoppingCart, CheckSquare, Plus, Trash2, Check, ExternalLink, Clock, Tag, 
+  Smartphone, Share2, Copy, Bookmark, Sparkles, CheckCheck, GripVertical 
+} from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
 import { useDelete } from '../context/DeleteContext';
@@ -20,6 +23,13 @@ export const Tarefas: React.FC = () => {
   const [modalShortcutOpen, setModalShortcutOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  // Estados para Arrastar e Soltar (Drag & Drop)
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
+  const [draggedShopId, setDraggedShopId] = useState<string | null>(null);
+  const [dragOverShopId, setDragOverShopId] = useState<string | null>(null);
+
 
 
 
@@ -107,6 +117,46 @@ export const Tarefas: React.FC = () => {
     });
   };
 
+  // Reordenação por Arrastar e Soltar (Drag & Drop) - Tarefas
+  const handleDragStartTask = (e: React.DragEvent, id: string) => {
+    setDraggedTaskId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+  };
+
+  const handleDragOverTask = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverTaskId !== id) {
+      setDragOverTaskId(id);
+    }
+  };
+
+  const handleDropTask = async (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const sourceId = draggedTaskId || e.dataTransfer.getData('text/plain');
+    setDraggedTaskId(null);
+    setDragOverTaskId(null);
+
+    if (!sourceId || sourceId === targetId) return;
+
+    const currentTasks = [...myTasks];
+    const sourceIndex = currentTasks.findIndex(t => t.id === sourceId);
+    const targetIndex = currentTasks.findIndex(t => t.id === targetId);
+
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const [movedTask] = currentTasks.splice(sourceIndex, 1);
+    currentTasks.splice(targetIndex, 0, movedTask);
+
+    const otherTasks = (db.gescompTasks || []).filter(t => !myTasks.some(mt => mt.id === t.id));
+    await updateDb(d => ({
+      ...d,
+      gescompTasks: [...currentTasks, ...otherTasks]
+    }), 'TASKS_REORDERED');
+  };
+
+
   // Handlers para a Lista Rápida de Compras
   const handleAddShoppingItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,6 +221,45 @@ export const Tarefas: React.FC = () => {
     });
   };
 
+  // Reordenação por Arrastar e Soltar (Drag & Drop) - Compras Rápidas
+  const handleDragStartShop = (e: React.DragEvent, id: string) => {
+    setDraggedShopId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+  };
+
+  const handleDragOverShop = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverShopId !== id) {
+      setDragOverShopId(id);
+    }
+  };
+
+  const handleDropShop = async (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const sourceId = draggedShopId || e.dataTransfer.getData('text/plain');
+    setDraggedShopId(null);
+    setDragOverShopId(null);
+
+    if (!sourceId || sourceId === targetId) return;
+
+    const currentShop = [...shoppingItems];
+    const sourceIndex = currentShop.findIndex(s => s.id === sourceId);
+    const targetIndex = currentShop.findIndex(s => s.id === targetId);
+
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const [movedShop] = currentShop.splice(sourceIndex, 1);
+    currentShop.splice(targetIndex, 0, movedShop);
+
+    await updateDb(d => ({
+      ...d,
+      gescompShoppingList: currentShop
+    }), 'SHOPPING_LIST_REORDERED');
+  };
+
+
   const getStatusBadge = (item: ShoppingItem) => {
     if (item.status === 'em_cotacao') {
       return <Badge variant="info">Em Cotação</Badge>;
@@ -231,7 +320,14 @@ export const Tarefas: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
           {/* CARD 1: MINHAS TAREFAS RÁPIDAS */}
-          <Card title="Minhas Tarefas Rápidas">
+          <Card 
+            title="Minhas Tarefas Rápidas"
+            action={
+              <span className="text-[11px] text-teal-400 font-medium flex items-center gap-1">
+                <span>↕ Arraste para reordenar</span>
+              </span>
+            }
+          >
             <form onSubmit={handleAddTask} className="flex gap-2 mb-4">
               <input
                 type="text"
@@ -246,32 +342,60 @@ export const Tarefas: React.FC = () => {
             </form>
 
             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-              {myTasks.map(t => (
-                <div
-                  key={t.id}
-                  className={`flex items-center justify-between p-3 rounded-xl border transition-all text-xs ${
-                    t.completed 
-                      ? 'bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800/50 opacity-60 line-through' 
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 cursor-pointer flex-1" onClick={() => handleToggleTask(t.id)}>
-                    <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-colors ${
-                      t.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 dark:border-slate-700'
-                    }`}>
-                      {t.completed && <Check className="w-3.5 h-3.5" />}
-                    </div>
-                    <span className="font-medium text-slate-900 dark:text-white">{t.text}</span>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteTask(t)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-rose-500 transition-colors"
-                    title="Excluir Tarefa"
+              {myTasks.map(t => {
+                const isDragging = draggedTaskId === t.id;
+                const isDragOver = dragOverTaskId === t.id;
+
+                return (
+                  <div
+                    key={t.id}
+                    draggable
+                    onDragStart={e => handleDragStartTask(e, t.id)}
+                    onDragOver={e => handleDragOverTask(e, t.id)}
+                    onDragLeave={() => { if (dragOverTaskId === t.id) setDragOverTaskId(null); }}
+                    onDragEnd={() => { setDraggedTaskId(null); setDragOverTaskId(null); }}
+                    onDrop={e => handleDropTask(e, t.id)}
+                    className={`flex items-center justify-between p-3 rounded-xl border transition-all text-xs select-none ${
+                      isDragging
+                        ? 'opacity-40 border-dashed border-teal-500 scale-[0.98]'
+                        : isDragOver
+                        ? 'ring-2 ring-teal-500 border-teal-500 bg-teal-500/10 scale-[1.01]'
+                        : t.completed 
+                        ? 'bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800/50 opacity-60 line-through' 
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                    }`}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                      <div 
+                        className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-slate-400 hover:text-teal-400 transition-colors"
+                        title="Segure e arraste para mudar a posição"
+                      >
+                        <GripVertical className="w-4 h-4" />
+                      </div>
+
+                      <div 
+                        className="flex items-center gap-3 cursor-pointer flex-1 min-w-0" 
+                        onClick={() => handleToggleTask(t.id)}
+                      >
+                        <div className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
+                          t.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 dark:border-slate-700'
+                        }`}>
+                          {t.completed && <Check className="w-3.5 h-3.5" />}
+                        </div>
+                        <span className="font-medium text-slate-900 dark:text-white truncate">{t.text}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleDeleteTask(t)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-rose-500 transition-colors shrink-0 ml-2"
+                      title="Excluir Tarefa"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
 
               {myTasks.length === 0 && (
                 <p className="text-center py-8 text-slate-400 text-xs">Nenhuma tarefa pendente no momento.</p>
@@ -283,9 +407,12 @@ export const Tarefas: React.FC = () => {
           <Card 
             title="Lista de Compras & Suprimentos Rápidos"
             action={
-              <span className="text-[11px] text-teal-400 font-bold">
-                Sincronizado com Compras &amp; RFQ
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-amber-400 font-medium hidden sm:inline">↕ Arraste</span>
+                <span className="text-[11px] text-teal-400 font-bold">
+                  Sincronizado com Compras &amp; RFQ
+                </span>
+              </div>
             }
           >
             {/* Banner de integração */}
@@ -322,49 +449,77 @@ export const Tarefas: React.FC = () => {
             </form>
 
             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-              {shoppingItems.map(item => (
-                <div
-                  key={item.id}
-                  className={`flex items-center justify-between p-3 rounded-xl border transition-all text-xs ${
-                    item.completed 
-                      ? 'bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800/50 opacity-60 line-through' 
-                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 cursor-pointer flex-1" onClick={() => handleToggleShoppingItem(item.id)}>
-                    <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-colors ${
-                      item.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 dark:border-slate-700'
-                    }`}>
-                      {item.completed && <Check className="w-3.5 h-3.5" />}
-                    </div>
-                    <div>
-                      <span className="font-medium text-slate-900 dark:text-white block">{item.item}</span>
-                      {item.quantidade && (
-                        <span className="text-[10px] text-slate-400">
-                          Qtd: {item.quantidade} {item.unidade || 'UN'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+              {shoppingItems.map(item => {
+                const isDragging = draggedShopId === item.id;
+                const isDragOver = dragOverShopId === item.id;
 
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(item)}
-                    <button
-                      onClick={() => handleDeleteShoppingItem(item)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-rose-500 transition-colors"
-                      title="Excluir Item da Lista"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                return (
+                  <div
+                    key={item.id}
+                    draggable
+                    onDragStart={e => handleDragStartShop(e, item.id)}
+                    onDragOver={e => handleDragOverShop(e, item.id)}
+                    onDragLeave={() => { if (dragOverShopId === item.id) setDragOverShopId(null); }}
+                    onDragEnd={() => { setDraggedShopId(null); setDragOverShopId(null); }}
+                    onDrop={e => handleDropShop(e, item.id)}
+                    className={`flex items-center justify-between p-3 rounded-xl border transition-all text-xs select-none ${
+                      isDragging
+                        ? 'opacity-40 border-dashed border-amber-500 scale-[0.98]'
+                        : isDragOver
+                        ? 'ring-2 ring-amber-500 border-amber-500 bg-amber-500/10 scale-[1.01]'
+                        : item.completed 
+                        ? 'bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800/50 opacity-60 line-through' 
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                      <div 
+                        className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-slate-400 hover:text-amber-400 transition-colors"
+                        title="Segure e arraste para mudar a posição"
+                      >
+                        <GripVertical className="w-4 h-4" />
+                      </div>
+
+                      <div 
+                        className="flex items-center gap-3 cursor-pointer flex-1 min-w-0" 
+                        onClick={() => handleToggleShoppingItem(item.id)}
+                      >
+                        <div className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
+                          item.completed ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 dark:border-slate-700'
+                        }`}>
+                          {item.completed && <Check className="w-3.5 h-3.5" />}
+                        </div>
+                        <div className="truncate">
+                          <span className="font-medium text-slate-900 dark:text-white block truncate">{item.item}</span>
+                          {item.quantidade && (
+                            <span className="text-[10px] text-slate-400">
+                              Qtd: {item.quantidade} {item.unidade || 'UN'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      {getStatusBadge(item)}
+                      <button
+                        onClick={() => handleDeleteShoppingItem(item)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-rose-500 transition-colors"
+                        title="Excluir Item da Lista"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {shoppingItems.length === 0 && (
                 <p className="text-center py-8 text-slate-400 text-xs">Nenhum item na lista de compras no momento.</p>
               )}
             </div>
           </Card>
+
         </div>
       )}
 
