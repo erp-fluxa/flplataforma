@@ -16,9 +16,11 @@ export const Tarefas: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'rapido' | 'detalhado'>('rapido');
   const [newTaskText, setNewTaskText] = useState('');
+  const [newShoppingText, setNewShoppingText] = useState('');
   const [modalShortcutOpen, setModalShortcutOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
 
 
   useEffect(() => {
