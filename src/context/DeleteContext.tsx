@@ -94,7 +94,7 @@ export const DeleteProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setModalOpen(true);
   }, []);
 
-  // Execução da exclusão após confirmação
+  // Execução da exclusão após confirmação de forma 100% ATÔMICA
   const handleConfirmDelete = async () => {
     if (!modalOptions) return;
 
@@ -120,10 +120,6 @@ export const DeleteProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         moduleKey: modalOptions.moduleKey
       };
 
-      // 1. Executa a ação de exclusão do módulo
-      await modalOptions.onDelete();
-
-      // 2. Grava na Lixeira e Log de Auditoria
       const auditLog = {
         id: uid('log'),
         timestamp: now,
@@ -133,13 +129,84 @@ export const DeleteProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         details: `${modalOptions.itemType} "${modalOptions.itemName}" excluído com sucesso.`
       };
 
-      await updateDb(prev => ({
-        ...prev,
-        deletedItems: [deletedRecord, ...(prev.deletedItems || [])],
-        auditLogs: [auditLog, ...(prev.auditLogs || [])]
-      }), `DELETE_${modalOptions.entityType.toUpperCase()}`);
+      // 1. ATOMIC UPDATE: Remove da respectiva coleção e adiciona na lixeira em UMA ÚNICA chamada
+      await updateDb(prev => {
+        let nextDb = { ...prev };
+        const idToRemove = modalOptions.originalId;
 
-      // 3. Fecha o modal e abre o Toast de Desfazer
+        switch (modalOptions.entityType) {
+          case 'shoppingItem':
+            nextDb.gescompShoppingList = (prev.gescompShoppingList || []).filter(i => i.id !== idToRemove);
+            break;
+          case 'task':
+            nextDb.gescompTasks = (prev.gescompTasks || []).filter(t => t.id !== idToRemove);
+            break;
+          case 'user':
+            nextDb.users = (prev.users || []).filter(u => u.id !== idToRemove);
+            break;
+          case 'company':
+            nextDb.companies = (prev.companies || []).filter(c => c.id !== idToRemove);
+            if (prev.currentCompanyId === idToRemove) {
+              const remaining = (prev.companies || []).filter(c => c.id !== idToRemove);
+              nextDb.currentCompanyId = remaining[0]?.id || 'comp-1';
+              nextDb.company = remaining[0] || prev.company;
+            }
+            break;
+          case 'product':
+            nextDb.products = (prev.products || []).filter(p => p.id !== idToRemove);
+            break;
+          case 'category':
+            nextDb.materialCategories = (prev.materialCategories || []).filter(c => c.id !== idToRemove);
+            break;
+          case 'customer':
+            nextDb.customers = (prev.customers || []).filter(c => c.id !== idToRemove);
+            break;
+          case 'supplier':
+            nextDb.suppliers = (prev.suppliers || []).filter(s => s.id !== idToRemove);
+            break;
+          case 'quotation':
+            nextDb.quotations = (prev.quotations || []).filter(q => q.id !== idToRemove);
+            break;
+          case 'purchaseOrder':
+            nextDb.purchaseOrders = (prev.purchaseOrders || []).filter(o => o.id !== idToRemove);
+            nextDb.orders = (prev.orders || []).filter(o => o.id !== idToRemove);
+            break;
+          case 'productionOrder':
+            nextDb.productionOrders = (prev.productionOrders || []).filter(o => o.id !== idToRemove);
+            break;
+          case 'salesOrder':
+            nextDb.salesOrders = (prev.salesOrders || []).filter(p => p.id !== idToRemove);
+            break;
+          case 'workCenter':
+            nextDb.workCenters = (prev.workCenters || []).filter(w => w.id !== idToRemove);
+            break;
+          case 'warehouse':
+            nextDb.warehouses = (prev.warehouses || []).filter(w => w.id !== idToRemove);
+            break;
+          case 'location':
+            nextDb.locations = (prev.locations || []).filter(l => l.id !== idToRemove);
+            break;
+          case 'bomVersion':
+            nextDb.bomVersions = (prev.bomVersions || []).filter(b => b.id !== idToRemove);
+            break;
+          default:
+            break;
+        }
+
+        // Adiciona à lixeira e ao log de auditoria
+        nextDb.deletedItems = [deletedRecord, ...(prev.deletedItems || [])];
+        nextDb.auditLogs = [auditLog, ...(prev.auditLogs || [])];
+        return nextDb;
+      }, `DELETE_${modalOptions.entityType.toUpperCase()}`);
+
+      // Executa callback adicional de onDelete caso precise disparar eventos externos
+      if (modalOptions.onDelete) {
+        try {
+          await modalOptions.onDelete();
+        } catch (_) {}
+      }
+
+      // 2. Fecha o modal e abre o Toast de Desfazer
       setModalOpen(false);
       setModalOptions(null);
       setUndoItem(deletedRecord);
@@ -149,6 +216,7 @@ export const DeleteProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsDeleting(false);
     }
   };
+
 
   // Restauração de Item (Camada 1 e Camada 2)
   const restoreItem = useCallback(async (recordId: string): Promise<{ success: boolean; error?: string }> => {
