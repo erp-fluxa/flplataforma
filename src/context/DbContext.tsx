@@ -162,8 +162,8 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
           if (backupTimestamp !== lastSyncTimestampRef.current) {
             lastSyncTimestampRef.current = backupTimestamp;
-            setDb(prev => {
-              const merged = deepMergeDbState(prev, cloudDb);
+            setDb(() => {
+              const merged = deepMergeDbState(INITIAL_DATABASE, cloudDb);
               merged.lastBackup = backupTimestamp;
 
               STORAGE_KEYS.forEach(key => {
@@ -1212,7 +1212,16 @@ export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         })
         .on('broadcast', { event: 'fluxa_sync' }, (payload: any) => {
           if (payload?.payload?.dados) {
-            setDb(prev => deepMergeDbState(prev, payload.payload.dados));
+            const incomingDb = payload.payload.dados;
+            const ts = payload.payload.timestamp ? new Date(payload.payload.timestamp).toISOString() : new Date().toISOString();
+            lastSyncTimestampRef.current = ts;
+            setDb(() => {
+              const merged = deepMergeDbState(INITIAL_DATABASE, incomingDb);
+              STORAGE_KEYS.forEach(key => {
+                safeLocalStorage.setItem(key, JSON.stringify(merged));
+              });
+              return merged;
+            });
           } else {
             syncFromCloud();
           }
