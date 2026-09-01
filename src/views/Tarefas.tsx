@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { ShoppingCart, CheckSquare, Plus, Trash2, Check, ExternalLink, Clock, Tag } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShoppingCart, CheckSquare, Plus, Trash2, Check, ExternalLink, Clock, Tag, Smartphone, Share2, Copy, Bookmark, Sparkles, CheckCheck } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
 import { useDelete } from '../context/DeleteContext';
-import { Button, Card, Badge } from '../components/ui';
+import { Button, Card, Badge, Modal } from '../components/ui';
+
 import { uid } from '../lib/formatters';
 import { FluxaTask, ShoppingItem } from '../types';
 import { ListaCompras } from './ListaCompras';
@@ -15,8 +16,41 @@ export const Tarefas: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'rapido' | 'detalhado'>('rapido');
   const [newTaskText, setNewTaskText] = useState('');
-  const [newShoppingText, setNewShoppingText] = useState('');
+  const [modalShortcutOpen, setModalShortcutOpen] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  const handleInstallPWA = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        alert('Aplicativo / Atalho instalado com sucesso!');
+        setDeferredPrompt(null);
+        setModalShortcutOpen(false);
+      }
+    }
+  };
+
+  const handleCopyDirectLink = () => {
+    const directUrl = `${window.location.origin}/tarefas`;
+    navigator.clipboard.writeText(directUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+
+>>>>>>> aae391d (feat(compras): dashboard de acao operacional, 5 secoes priorizadas e correcoes de exclusao)
   // 1. Minhas Tarefas Operacionais
   const myTasks = (db.gescompTasks || []).filter(
     t => !t.userId || t.userId === user?.id || user?.permissoes?.includes('*') || user?.roleId === 'super_admin'
@@ -151,9 +185,9 @@ export const Tarefas: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* Abas Superiores */}
-      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-        <div className="flex items-center gap-2">
+      {/* Abas Superiores & Botão de Atalho PWA */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setActiveTab('rapido')}
             className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
@@ -178,6 +212,16 @@ export const Tarefas: React.FC = () => {
             <span>Gerenciador Completo de Suprimentos</span>
           </button>
         </div>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<Smartphone className="w-3.5 h-3.5 text-teal-400" />}
+          onClick={() => setModalShortcutOpen(true)}
+          className="border-teal-500/40 text-teal-400 font-bold hover:bg-teal-500/10 shadow-sm"
+        >
+          📱 Criar Atalho na Tela Inicial
+        </Button>
       </div>
 
       {/* Conteúdo Dinâmico */}
@@ -322,6 +366,82 @@ export const Tarefas: React.FC = () => {
           </Card>
         </div>
       )}
+
+      {/* Modal de Atalho Direto na Tela Inicial (PWA) */}
+
+      <Modal
+        isOpen={modalShortcutOpen}
+        onClose={() => setModalShortcutOpen(false)}
+        title="📱 Atalho Direto para Tarefas & Compras Rápidas"
+      >
+        <div className="space-y-4 text-xs">
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-teal-950/40 via-brand-950/20 to-slate-900 border border-teal-500/30 space-y-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-teal-400" />
+              <span className="font-extrabold text-sm text-teal-300">Acesso Instantâneo em 1 Clique</span>
+            </div>
+            <p className="text-slate-300 leading-relaxed">
+              Crie um ícone do <b>Fluxa ERP</b> direto na tela inicial do seu celular ou barra de favoritos do computador. Ao abrir o atalho, você cai <b>direto nesta tela de Tarefas & Compras Rápidas</b>, mantendo seu mesmo login e sincronização em nuvem.
+            </p>
+          </div>
+
+          {/* Botão de Instalação Automática se suportado */}
+          {deferredPrompt && (
+            <div className="p-3.5 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-between gap-2">
+              <div>
+                <span className="font-bold text-teal-300 block">Navegador Compatível com PWA</span>
+                <span className="text-[11px] text-slate-400">Instale o atalho nativo diretamente com 1 toque:</span>
+              </div>
+              <Button variant="primary" size="sm" onClick={handleInstallPWA} icon={<Smartphone className="w-3.5 h-3.5" />}>
+                Instalar Atalho
+              </Button>
+            </div>
+          )}
+
+          {/* Instruções por Sistema Operacional */}
+          <div className="space-y-3 pt-1">
+            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1.5">
+              <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <span>🤖 Android (Google Chrome / Samsung Internet)</span>
+              </span>
+              <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-400 text-[11.5px]">
+                <li>Toque no menu de <b>três pontinhos (⋮)</b> no topo direito do navegador.</li>
+                <li>Selecione <b>"Adicionar à tela inicial"</b> ou <b>"Instalar aplicativo"</b>.</li>
+                <li>Um ícone do Fluxa será criado no seu celular abrindo diretamente aqui!</li>
+              </ol>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1.5">
+              <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <span>🍏 iPhone / iPad (Apple Safari)</span>
+              </span>
+              <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-400 text-[11.5px]">
+                <li>Toque no botão de <b>Compartilhar (quadrado com seta para cima)</b> no rodapé do Safari.</li>
+                <li>Role para baixo e toque em <b>"Adicionar à Tela de Início"</b>.</li>
+                <li>Toque em <b>"Adicionar"</b> no canto superior direito.</li>
+              </ol>
+            </div>
+          </div>
+
+          {/* Copiar Link Direto */}
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+            <div className="truncate text-slate-400 text-[11px] font-mono">
+              {window.location.origin}/tarefas
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={copiedLink ? <CheckCheck className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              onClick={handleCopyDirectLink}
+              className="shrink-0 font-bold"
+            >
+              {copiedLink ? 'Link Copiado!' : 'Copiar Link Direto'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
+
+

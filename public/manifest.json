@@ -2,16 +2,66 @@
   "name": "Fluxa ERP Industrial",
   "short_name": "Fluxa ERP",
   "description": "Sistema Integrado de Gestão ERP, Compras, PCP, Produção e Estoque",
-  "start_url": "./",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#070D1F",
   "theme_color": "#070D1F",
   "icons": [
     {
-      "src": "assets/fluxa_logo_icone.png",
+      "src": "/fluxa_logo_icone.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/fluxa_logo_icone.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tarefas & Compras Rápidas",
+      "short_name": "Tarefas",
+      "description": "Acesso direto às tarefas operacionais e lista de compras",
+      "url": "/tarefas",
+      "icons": [
+        {
+          "src": "/fluxa_logo_icone.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Controle de Estoque",
+      "short_name": "Estoque",
+      "description": "Consulta rápida de saldos físicos e inventário",
+      "url": "/estoque",
+      "icons": [
+        {
+          "src": "/fluxa_logo_icone.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Compras & Cotações",
+      "short_name": "Compras",
+      "description": "Gestão de suprimentos e cotações de preços",
+      "url": "/compras",
+      "icons": [
+        {
+          "src": "/fluxa_logo_icone.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }
+

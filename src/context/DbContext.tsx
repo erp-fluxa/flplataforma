@@ -79,30 +79,36 @@ function deepMergeDbState(base: DatabaseState, userState: Partial<DatabaseState>
       ...(base.systemSettings || {}),
       ...(userState.systemSettings || {})
     },
-    users: mergeArrayById(base.users || [], userState.users || []),
-    roles: mergeArrayById(base.roles || [], userState.roles || []),
-    customers: mergeArrayById(base.customers || [], userState.customers || []),
-    suppliers: mergeArrayById(base.suppliers || [], userState.suppliers || []),
-    products: mergeArrayById(base.products || [], userState.products || []),
-    materialCategories: mergeArrayById(base.materialCategories || [], userState.materialCategories || []),
-    bomItems: mergeArrayById(base.bomItems || [], userState.bomItems || []),
-    quotations: mergeArrayById(base.quotations || [], userState.quotations || []),
-    quotationItems: mergeArrayById(base.quotationItems || [], userState.quotationItems || []),
-    quotationPrices: mergeArrayById(base.quotationPrices || [], userState.quotationPrices || []),
-    orders: mergeArrayById(base.orders || [], userState.orders || []),
-    purchaseOrders: mergeArrayById(base.purchaseOrders || [], userState.purchaseOrders || []),
-    productionOrders: mergeArrayById(base.productionOrders || [], userState.productionOrders || []),
-    salesOrders: mergeArrayById(base.salesOrders || [], userState.salesOrders || []),
-    gescompTasks: mergeArrayById(base.gescompTasks || [], userState.gescompTasks || []),
-    gescompShoppingList: mergeArrayById(base.gescompShoppingList || [], userState.gescompShoppingList || []),
-    deletedItems: mergeArrayById(base.deletedItems || [], userState.deletedItems || []),
-    auditLogs: mergeArrayById(base.auditLogs || [], userState.auditLogs || []),
+    users: Array.isArray(userState.users) && userState.users.length > 0
+      ? mergeArrayById(base.users || [], userState.users || [])
+      : (base.users || []),
+    roles: Array.isArray(userState.roles) && userState.roles.length > 0
+      ? mergeArrayById(base.roles || [], userState.roles || [])
+      : (base.roles || []),
+    customers: Array.isArray(userState.customers) ? userState.customers : (base.customers || []),
+    suppliers: Array.isArray(userState.suppliers) ? userState.suppliers : (base.suppliers || []),
+    products: Array.isArray(userState.products) ? userState.products : (base.products || []),
+    materialCategories: Array.isArray(userState.materialCategories) ? userState.materialCategories : (base.materialCategories || []),
+    bomItems: Array.isArray(userState.bomItems) ? userState.bomItems : (base.bomItems || []),
+    quotations: Array.isArray(userState.quotations) ? userState.quotations : (base.quotations || []),
+    quotationItems: Array.isArray(userState.quotationItems) ? userState.quotationItems : (base.quotationItems || []),
+    quotationPrices: Array.isArray(userState.quotationPrices) ? userState.quotationPrices : (base.quotationPrices || []),
+    orders: Array.isArray(userState.orders) ? userState.orders : (base.orders || []),
+    purchaseOrders: Array.isArray(userState.purchaseOrders) ? userState.purchaseOrders : (base.purchaseOrders || []),
+    productionOrders: Array.isArray(userState.productionOrders) ? userState.productionOrders : (base.productionOrders || []),
+    salesOrders: Array.isArray(userState.salesOrders) ? userState.salesOrders : (base.salesOrders || []),
+    gescompTasks: Array.isArray(userState.gescompTasks) ? userState.gescompTasks : (base.gescompTasks || []),
+    gescompShoppingList: Array.isArray(userState.gescompShoppingList) ? userState.gescompShoppingList : (base.gescompShoppingList || []),
+    deletedItems: Array.isArray(userState.deletedItems) ? userState.deletedItems : (base.deletedItems || []),
+    auditLogs: Array.isArray(userState.auditLogs) ? userState.auditLogs : (base.auditLogs || []),
+
     stockBalances: Array.isArray(userState.stockBalances) ? userState.stockBalances : base.stockBalances,
     stockMovements: Array.isArray(userState.stockMovements) ? userState.stockMovements : base.stockMovements,
     stockReservations: Array.isArray(userState.stockReservations) ? userState.stockReservations : base.stockReservations,
-    crmLeads: mergeArrayById((base as any).crmLeads || [], (userState as any).crmLeads || [])
+    crmLeads: Array.isArray((userState as any).crmLeads) ? (userState as any).crmLeads : ((base as any).crmLeads || [])
   } as DatabaseState;
 }
+
 
 export const DbProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [db, setDb] = useState<DatabaseState>(() => {

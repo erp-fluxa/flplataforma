@@ -1,15 +1,98 @@
 import React, { useState } from 'react';
+import { CheckSquare, ShoppingCart, Plus, Check, ArrowRight, Sparkles, CheckCircle2, Clock, ListTodo } from 'lucide-react';
 import { useDb } from '../context/DbContext';
 import { useAuth } from '../context/AuthContext';
-import { fmtMoeda, fmtQtd } from '../lib/formatters';
+import { Button, Badge } from '../components/ui';
+import { fmtMoeda, fmtQtd, uid } from '../lib/formatters';
+import { FluxaTask, ShoppingItem } from '../types';
+import { DashboardCompras } from './DashboardCompras';
 
 type DashTab = 'estoque' | 'comercial' | 'compras' | 'producao' | 'financeiro' | 'pipeline';
 
+
 export const Dashboard: React.FC<{ onNavigate?: (path: string) => void }> = ({ onNavigate }) => {
-  const { db } = useDb();
+  const { db, updateDb } = useDb();
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<DashTab>('estoque');
+  const [quickTaskText, setQuickTaskText] = useState('');
+  const [quickShoppingText, setQuickShoppingText] = useState('');
+
+  // =================== TAREFAS & COMPRAS RÁPIDAS (WIDGET DASHBOARD) ===================
+  const allTasks = db.gescompTasks || [];
+  const myPendingTasks = allTasks.filter(
+    t => !t.completed && (!t.userId || t.userId === user?.id || user?.permissoes?.includes('*') || user?.roleId === 'super_admin')
+  );
+  const pendingTasksCount = myPendingTasks.length;
+  const recentPendingTasks = myPendingTasks.slice(0, 4);
+
+  const allShopping = db.gescompShoppingList || [];
+  const pendingShopping = allShopping.filter(i => !i.completed);
+  const pendingShoppingCount = pendingShopping.length;
+  const recentShopping = pendingShopping.slice(0, 4);
+
+  const handleToggleTask = async (taskId: string) => {
+    await updateDb(d => ({
+      ...d,
+      gescompTasks: (d.gescompTasks || []).map(t => t.id === taskId ? { ...t, completed: !t.completed } : t)
+    }), 'TASK_TOGGLED');
+  };
+
+  const handleAddQuickTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickTaskText.trim()) return;
+    const task: FluxaTask = {
+      id: uid('tsk'),
+      userId: user?.id || 'usr-admin',
+      text: quickTaskText.trim(),
+      completed: false,
+      createdAt: new Date().toISOString()
+    };
+    await updateDb(d => ({
+      ...d,
+      gescompTasks: [task, ...(d.gescompTasks || [])]
+    }), 'TASK_ADDED');
+    setQuickTaskText('');
+  };
+
+  const handleToggleShopping = async (itemId: string) => {
+    await updateDb(d => ({
+      ...d,
+      gescompShoppingList: (d.gescompShoppingList || []).map(i => i.id === itemId ? { ...i, completed: !i.completed } : i)
+    }), 'SHOPPING_ITEM_TOGGLED');
+  };
+
+  const handleAddQuickShopping = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickShoppingText.trim()) return;
+    const now = new Date().toISOString();
+    const newItem: ShoppingItem = {
+      id: uid('shop'),
+      userId: user?.id || 'usr-admin',
+      item: quickShoppingText.trim(),
+      categoria: 'Geral',
+      unidade: 'UN',
+      quantidade: 1,
+      prioridade: 'normal',
+      status: 'aguardando_cotacao',
+      completed: false,
+      historicoStatus: [
+        {
+          id: uid('hist'),
+          paraStatus: 'aguardando_cotacao',
+          data: now,
+          usuarioNome: user?.name || 'Usuário'
+        }
+      ],
+      createdAt: now
+    };
+    await updateDb(d => ({
+      ...d,
+      gescompShoppingList: [newItem, ...(d.gescompShoppingList || [])]
+    }), 'SHOPPING_ITEM_ADDED');
+    setQuickShoppingText('');
+  };
+
 
   const sectorTabs = [
     { id: 'estoque', label: 'Estoque' },
@@ -126,6 +209,144 @@ export const Dashboard: React.FC<{ onNavigate?: (path: string) => void }> = ({ o
           );
         })}
       </div>
+
+      {/* 2.1 WIDGET DE ACESSO RÁPIDO: TAREFAS & COMPRAS (SINCRONIZADO EM TEMPO REAL) */}
+      <div className="p-4 sm:p-5 rounded-2xl border border-teal-500/30 bg-[#0F172A]/90 dark:bg-[#0B1222] shadow-md space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-sm text-slate-100">Tarefas Operacionais & Compras Rápidas</h3>
+                <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[10.5px] font-mono text-emerald-400 font-bold hidden sm:inline">Tempo Real</span>
+              </div>
+              <p className="text-[11.5px] text-slate-400">
+                Gerencie pendências urgentes e adicione itens de compra sem sair do Painel Principal.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Badge variant="info">{pendingTasksCount} tarefas</Badge>
+            <Badge variant="warning">{pendingShoppingCount} compras</Badge>
+            <button
+              onClick={() => onNavigate?.('/tarefas')}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 text-xs font-bold transition-all border border-teal-500/30"
+            >
+              <span>Abrir Tela Completa</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+          {/* COLUNA 1: MINHAS TAREFAS */}
+          <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <CheckSquare className="w-3.5 h-3.5 text-teal-400" />
+                <span>Minhas Tarefas Pendentes</span>
+              </span>
+              <span className="text-[11px] font-mono text-slate-400">{pendingTasksCount} pendentes</span>
+            </div>
+
+            <form onSubmit={handleAddQuickTask} className="flex gap-2">
+              <input
+                type="text"
+                value={quickTaskText}
+                onChange={e => setQuickTaskText(e.target.value)}
+                placeholder="Adicionar tarefa rápida..."
+                className="flex-1 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-950 text-xs text-slate-200 outline-none focus:border-teal-500"
+              />
+              <Button variant="primary" size="sm" type="submit" icon={<Plus className="w-3.5 h-3.5" />}>
+                Adicionar
+              </Button>
+            </form>
+
+            <div className="space-y-1.5 max-h-[190px] overflow-y-auto pr-1">
+              {recentPendingTasks.map(task => (
+                <div
+                  key={task.id}
+                  onClick={() => handleToggleTask(task.id)}
+                  className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800/80 bg-slate-950/60 hover:bg-slate-900 cursor-pointer transition-all text-xs"
+                >
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <div className="w-4 h-4 rounded-md border border-slate-700 flex items-center justify-center shrink-0">
+                      {task.completed && <Check className="w-3 h-3 text-emerald-400" />}
+                    </div>
+                    <span className="truncate font-medium text-slate-200">{task.text}</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 shrink-0 ml-2 font-mono">
+                    {new Date(task.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                  </span>
+                </div>
+              ))}
+
+              {recentPendingTasks.length === 0 && (
+                <div className="py-4 text-center text-slate-400 text-xs flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Nenhuma tarefa pendente! Tudo em dia.</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* COLUNA 2: COMPRAS RÁPIDAS */}
+          <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <ShoppingCart className="w-3.5 h-3.5 text-amber-400" />
+                <span>Lista Rápida de Suprimentos</span>
+              </span>
+              <span className="text-[11px] font-mono text-slate-400">{pendingShoppingCount} itens</span>
+            </div>
+
+            <form onSubmit={handleAddQuickShopping} className="flex gap-2">
+              <input
+                type="text"
+                value={quickShoppingText}
+                onChange={e => setQuickShoppingText(e.target.value)}
+                placeholder="Ex: 5 caixas parafuso M3, 1 rolo PETG..."
+                className="flex-1 px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-950 text-xs text-slate-200 outline-none focus:border-teal-500"
+              />
+              <Button variant="primary" size="sm" type="submit" icon={<Plus className="w-3.5 h-3.5" />}>
+                Adicionar
+              </Button>
+            </form>
+
+            <div className="space-y-1.5 max-h-[190px] overflow-y-auto pr-1">
+              {recentShopping.map(item => (
+                <div
+                  key={item.id}
+                  onClick={() => handleToggleShopping(item.id)}
+                  className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800/80 bg-slate-950/60 hover:bg-slate-900 cursor-pointer transition-all text-xs"
+                >
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <div className="w-4 h-4 rounded-md border border-slate-700 flex items-center justify-center shrink-0">
+                      {item.completed && <Check className="w-3 h-3 text-emerald-400" />}
+                    </div>
+                    <span className="truncate font-medium text-slate-200">{item.item}</span>
+                  </div>
+                  <Badge variant={item.status === 'em_cotacao' ? 'info' : 'warning'}>
+                    {item.status === 'em_cotacao' ? 'Em Cotação' : 'Pendente'}
+                  </Badge>
+                </div>
+              ))}
+
+              {recentShopping.length === 0 && (
+                <div className="py-4 text-center text-slate-400 text-xs flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Nenhum item de compra pendente.</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
 
       {/* ========================================================================= */}
       {/* 3. ABA ESTOQUE */}
@@ -296,78 +517,11 @@ export const Dashboard: React.FC<{ onNavigate?: (path: string) => void }> = ({ o
       {/* 5. ABA COMPRAS */}
       {/* ========================================================================= */}
       {activeTab === 'compras' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800/90 bg-white dark:bg-[#111A2D]">
-              <span className="block text-[12px] text-slate-400 mb-1">Pedidos de Compra em Aberto</span>
-              <span className="block text-[22px] sm:text-[24px] font-black text-white font-mono tracking-tight">4 pedidos</span>
-              <span className="block text-[11px] font-semibold text-emerald-500 mt-1">↓ Suprimentos em transporte</span>
-            </div>
-            <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800/90 bg-white dark:bg-[#111A2D]">
-              <span className="block text-[12px] text-slate-400 mb-1">Valor Comprometido em Pedidos</span>
-              <span className="block text-[22px] sm:text-[24px] font-black text-white font-mono tracking-tight">R$ 68.400,00</span>
-              <span className="block text-[11px] font-semibold text-emerald-500 mt-1">↑ Insumos contratados</span>
-            </div>
-            <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800/90 bg-white dark:bg-[#111A2D]">
-              <span className="block text-[12px] text-slate-400 mb-1">Cotações Aguardando Resposta</span>
-              <span className="block text-[22px] sm:text-[24px] font-black text-white font-mono tracking-tight">5 RFQs</span>
-              <span className="block text-[11px] font-semibold text-emerald-500 mt-1">↑ Em equalização de fornecedores</span>
-            </div>
-            <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800/90 bg-white dark:bg-[#111A2D]">
-              <span className="block text-[12px] text-slate-400 mb-1">Prazo Médio dos Fornecedores</span>
-              <span className="block text-[22px] sm:text-[24px] font-black text-white font-mono tracking-tight">7 dias</span>
-              <span className="block text-[11px] font-semibold text-emerald-500 mt-1">✓ Lead time dentro da meta</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Gráfico 1: Pedidos por Status */}
-            <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800/90 bg-white dark:bg-[#111A2D] flex flex-col justify-between">
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4">
-                PEDIDOS DE COMPRA POR STATUS
-              </h3>
-              <div className="h-56 flex items-end justify-around gap-4 px-6 pb-2 pt-6 border-b border-slate-800">
-                {comprasStatus.map(st => (
-                  <div key={st.label} className="flex flex-col items-center gap-2 flex-1">
-                    <span className="font-mono font-bold text-white text-xs">{st.val}</span>
-                    <div className="w-12 rounded-t-xs transition-all" style={{ height: `${(st.val / 7) * 100}%`, backgroundColor: st.color }} />
-                    <span className="text-[11px] font-bold text-slate-400">{st.label}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center justify-center gap-2 pt-4 text-xs font-medium text-slate-300">
-                <span>Qtd de Ordens de Compra por etapa</span>
-              </div>
-            </div>
-
-            {/* Gráfico 2: Top Itens com Mais Cotações */}
-            <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800/90 bg-white dark:bg-[#111A2D] flex flex-col justify-between">
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-4">
-                TOP ITENS COM MAIS COTAÇÕES ATIVAS
-              </h3>
-              <div className="space-y-3 my-auto">
-                {topCotacoesItens.map(it => {
-                  const widthPercent = (it.val / 7) * 100;
-                  return (
-                    <div key={it.name} className="flex items-center gap-3 text-xs">
-                      <span className="w-36 font-bold text-slate-400 text-right shrink-0 truncate text-[11px]">{it.name}</span>
-                      <div className="flex-1 h-6 bg-[#070D1F] rounded-xs relative overflow-hidden border border-slate-800/40">
-                        <div className="h-full bg-[#1baf7a] rounded-xs flex items-center justify-end pr-2 text-[10px] font-bold text-white" style={{ width: `${widthPercent}%` }}>
-                          {it.val}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex items-center justify-center gap-2 pt-4 text-xs font-medium text-slate-300">
-                <span className="w-3 h-3 bg-[#1baf7a] rounded-xs" />
-                <span>Cotações Ativas (RFQs)</span>
-              </div>
-            </div>
-          </div>
+        <div className="pt-2">
+          <DashboardCompras onNavigateTab={(tab) => onNavigate?.('/compras')} />
         </div>
       )}
+
 
       {/* ========================================================================= */}
       {/* 6. ABA PRODUÇÃO */}

@@ -135,14 +135,15 @@ export const PedidosCompra: React.FC = () => {
   const handleReceberPedido = async (pedido: PurchaseOrder) => {
     if (confirm(`Confirmar o recebimento físico total do Pedido ${pedido.codigo}? O saldo dos insumos será atualizado no estoque central.`)) {
       const sup = db.suppliers.find(s => s.id === pedido.supplierId);
+      const agora = new Date().toISOString();
       
       await updateDb(prev => ({
         ...prev,
-        orders: prev.orders.map(o => o.id === pedido.id ? { ...o, status: 'recebido' } : o),
+        orders: prev.orders.map(o => o.id === pedido.id ? { ...o, status: 'recebido', dataEntregaReal: agora } : o),
         auditLogs: [
           {
             id: uid('log'),
-            timestamp: new Date().toISOString(),
+            timestamp: agora,
             action: 'PURCHASE_ORDER_RECEIVED',
             actor: { id: user?.id || 'admin', name: user?.name || 'Admin' },
             target: { tipo: 'PEDIDO_COMPRA', codigo: pedido.codigo },
@@ -155,6 +156,7 @@ export const PedidosCompra: React.FC = () => {
       alert(`Recebimento do Pedido ${pedido.codigo} concluído com sucesso!`);
     }
   };
+
 
   return (
     <div className="space-y-5">

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { User } from '../types';
+import { User, UserPreferences } from '../types';
 import { useDb } from './DbContext';
 import { safeLocalStorage, safeSessionStorage } from '../lib/safeStorage';
 
@@ -9,6 +9,7 @@ interface AuthContextType {
   logout: () => void;
   hasPermission: (permKey: string) => boolean;
   toggleSidebar: () => void;
+  updateUserPreferences: (prefs: Partial<UserPreferences>) => Promise<void>;
   sidebarCollapsed: boolean;
 }
 
@@ -36,22 +37,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
+  // Sincroniza preferências do usuário se forem atualizadas via nuvem / outro dispositivo
+  useEffect(() => {
+    if (user) {
+      const dbUser = (db.users || []).find(u => u.id === user.id || (u.username && u.username.toLowerCase() === user.username?.toLowerCase()));
+      if (dbUser && dbUser.preferences && JSON.stringify(dbUser.preferences) !== JSON.stringify(user.preferences)) {
+        const mergedUser: User = {
+          ...user,
+          ...dbUser,
+          preferences: { ...(user.preferences || {}), ...(dbUser.preferences || {}) }
+        };
+        setUser(mergedUser);
+        safeSessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(mergedUser));
+        if (safeLocalStorage.getItem(SESSION_USER_KEY)) {
+          safeLocalStorage.setItem(SESSION_USER_KEY, JSON.stringify(mergedUser));
+        }
+      }
+    }
+  }, [db.users]);
+
   const login = useCallback((identifier: string, pass: string, remember: boolean = false) => {
     const cleanId = identifier.trim().toLowerCase();
     
     // Master Super Admin Fallbacks
     if (cleanId === 'admin' && (pass === '041219' || pass === '123' || pass === 'admin')) {
+      const dbAdmin = (db.users || []).find(u => u.username?.toLowerCase() === 'admin' || u.id === 'usr-admin');
       const adminUser: User = {
-        id: 'usr-admin',
-        name: 'Super Admin',
+        id: dbAdmin?.id || 'usr-admin',
+        name: dbAdmin?.name || 'Super Admin',
         username: 'admin',
-        email: 'admin@fluxa.com.br',
+        email: dbAdmin?.email || 'admin@fluxa.com.br',
         password: '041219',
         roleId: 'super_admin',
         role: { id: 'super_admin', name: 'Super Admin' },
         permissoes: ['*'],
         active: true,
-        preferences: { sidebarCollapsed: false, theme: 'dark' }
+        preferences: dbAdmin?.preferences || { sidebarCollapsed: false, theme: 'dark', initialRoute: '/' }
       };
       setUser(adminUser);
       if (remember) safeLocalStorage.setItem(SESSION_USER_KEY, JSON.stringify(adminUser));
@@ -60,17 +81,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (cleanId === 'joaomarcos' && (pass === '123' || pass === '041219')) {
+      const dbJm = (db.users || []).find(u => u.username?.toLowerCase() === 'joaomarcos' || u.id === 'usr-joao-marcos');
       const jmUser: User = {
-        id: 'usr-joao-marcos',
-        name: 'João Marcos',
+        id: dbJm?.id || 'usr-joao-marcos',
+        name: dbJm?.name || 'João Marcos',
         username: 'joaomarcos',
-        email: 'joao@fluxa.com.br',
+        email: dbJm?.email || 'joao@fluxa.com.br',
         password: '123',
         roleId: 'super_admin',
         role: { id: 'super_admin', name: 'Super Admin' },
         permissoes: ['*'],
         active: true,
-        preferences: { sidebarCollapsed: false, theme: 'dark' }
+        preferences: dbJm?.preferences || { sidebarCollapsed: false, theme: 'dark', initialRoute: '/' }
       };
       setUser(jmUser);
       if (remember) safeLocalStorage.setItem(SESSION_USER_KEY, JSON.stringify(jmUser));
@@ -107,22 +129,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     safeLocalStorage.removeItem(SESSION_USER_KEY);
   }, []);
 
+  const updateUserPreferences = useCallback(async (newPrefs: Partial<UserPreferences>) => {
+    if (!user) return;
+    const updatedUser: User = {
+      ...user,
+      preferences: {
+        ...(user.preferences || {}),
+        ...newPrefs
+      }
+    };
+    setUser(updatedUser);
+    safeSessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(updatedUser));
+    if (safeLocalStorage.getItem(SESSION_USER_KEY)) {
+      safeLocalStorage.setItem(SESSION_USER_KEY, JSON.stringify(updatedUser));
+    }
+
+    await updateDb(d => {
+      const existing = (d.users || []).find(u => u.id === user.id || u.username === user.username);
+      const users = existing
+        ? d.users.map(u => (u.id === user.id || u.username === user.username) ? updatedUser : u)
+        : [...(d.users || []), updatedUser];
+      return { ...d, users };
+    }, 'USER_PREFERENCES_UPDATED');
+  }, [user, updateDb]);
+
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed(prev => {
       const next = !prev;
       if (user) {
-        const updatedUser = Object.assign({}, user, {
-          preferences: Object.assign({}, user.preferences, { sidebarCollapsed: next })
-        });
-        setUser(updatedUser);
-        updateDb(d => ({
-          ...d,
-          users: d.users.map(u => u.id === user.id ? updatedUser : u)
-        }));
+        updateUserPreferences({ sidebarCollapsed: next });
       }
       return next;
     });
-  }, [user, updateDb]);
+  }, [user, updateUserPreferences]);
 
   const hasPermission = useCallback((permKey: string) => {
     if (!user) return false;
@@ -138,6 +177,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logout,
       hasPermission,
       toggleSidebar,
+      updateUserPreferences,
       sidebarCollapsed
     }}>
       {children}
@@ -150,3 +190,4 @@ export const useAuth = () => {
   if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
+

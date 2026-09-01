@@ -24,8 +24,15 @@ export const App: React.FC = () => {
   const { loading } = useDb();
 
   const [currentPath, setCurrentPath] = useState<string>(() => {
-    return window.location.pathname || '/';
+    const path = window.location.pathname;
+    return path && path !== '/login' ? path : '/';
   });
+
+  const navigate = (path: string) => {
+    setCurrentPath(path);
+    window.history.pushState({}, '', path);
+    window.scrollTo(0, 0);
+  };
 
   useEffect(() => {
     const handlePopState = () => {
@@ -35,16 +42,21 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const navigate = (path: string) => {
-    setCurrentPath(path);
-    window.history.pushState({}, '', path);
-    window.scrollTo(0, 0);
-  };
+  // Redirecionamento inteligente para a Página Inicial configurada pelo usuário
+  useEffect(() => {
+    if (user && user.preferences?.initialRoute && user.preferences.initialRoute !== '/') {
+      const path = window.location.pathname;
+      if (path === '/' || path === '' || path === '/login') {
+        navigate(user.preferences.initialRoute);
+      }
+    }
+  }, [user?.id, user?.preferences?.initialRoute]);
 
   // Se não estiver logado, exibe a tela de login
   if (!user) {
     return <Login />;
   }
+
 
   // Roteamento SPA unificado sem duplicações
   const renderContent = () => {

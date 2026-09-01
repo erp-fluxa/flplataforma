@@ -11,7 +11,8 @@ import { Lixeira } from './Lixeira';
 
 export const Configuracoes: React.FC = () => {
   const { db, uploadLogo, resetLogos, updateDb, syncFromCloud, salvarEmpresa, excluirEmpresa, selecionarEmpresaAtiva } = useDb();
-  const { user } = useAuth();
+  const { user, updateUserPreferences } = useAuth();
+
   const { requestDelete } = useDelete();
 
   const isSuperAdmin = user?.roleId === 'super_admin' || user?.roleId === 'admin' || user?.role?.name?.toLowerCase().includes('admin') || user?.username === 'admin';
@@ -72,7 +73,14 @@ export const Configuracoes: React.FC = () => {
       if (editingUser.id) {
         const idx = users.findIndex(u => u.id === editingUser.id);
         if (idx !== -1) {
-          users[idx] = { ...users[idx], ...editingUser } as User;
+          users[idx] = {
+            ...users[idx],
+            ...editingUser,
+            preferences: {
+              ...(users[idx].preferences || {}),
+              ...(editingUser.preferences || {})
+            }
+          } as User;
         }
       } else {
         const newUser: User = {
@@ -84,17 +92,30 @@ export const Configuracoes: React.FC = () => {
           roleId: editingUser.roleId || 'operador',
           role: { id: editingUser.roleId || 'operador', name: editingUser.roleId || 'Operador' },
           permissoes: editingUser.permissoes || ['compras_ver', 'estoque_ver', 'producao_ver', 'vendas_ver'],
-          active: editingUser.active !== false
+          active: editingUser.active !== false,
+          preferences: {
+            sidebarCollapsed: false,
+            theme: 'dark',
+            initialRoute: editingUser.preferences?.initialRoute || '/'
+          }
         };
         users.push(newUser);
       }
       return { ...prev, users };
     }, 'USER_SAVED');
 
+    // Se o usuário editado for o usuário atualmente logado, sincroniza suas preferências locais imediatamente
+    if (editingUser.id === user?.id || editingUser.username?.toLowerCase() === user?.username?.toLowerCase()) {
+      if (editingUser.preferences) {
+        updateUserPreferences(editingUser.preferences);
+      }
+    }
+
     setModalUserOpen(false);
     setEditingUser(null);
     alert('Usuário salvo com sucesso!');
   };
+
 
   const handleToggleUserStatus = async (userToToggle: User) => {
     if (userToToggle.roleId === 'super_admin' && userToToggle.username === 'admin') {
@@ -470,6 +491,41 @@ export const Configuracoes: React.FC = () => {
               Novo Usuário
             </Button>
           </div>
+
+          {/* Card de Configuração Rápida da Minha Página Inicial */}
+          {user && (
+            <div className="p-4 rounded-2xl border border-teal-500/30 bg-gradient-to-r from-teal-950/20 via-slate-900 to-slate-900 shadow-sm flex flex-wrap items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-teal-400">⚡ Minha Página Inicial ao Fazer Login</span>
+                  <Badge variant="success">Sincronizado na Nuvem</Badge>
+                </div>
+                <p className="text-[11.5px] text-slate-400">
+                  Defina onde seu usuário <b>@{user.username}</b> começará automaticamente ao acessar o ERP em qualquer computador ou celular:
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={user.preferences?.initialRoute || '/'}
+                  onChange={async e => {
+                    const newRoute = e.target.value;
+                    await updateUserPreferences({ initialRoute: newRoute });
+                    alert(`Página inicial alterada com sucesso para: ${newRoute === '/' ? 'Dashboard' : newRoute}! Esta preferência segue seu usuário em qualquer aparelho.`);
+                  }}
+                  className="px-3 py-2 rounded-xl border border-teal-500/40 bg-slate-950 text-xs font-bold text-teal-300 outline-none focus:ring-1 focus:ring-teal-400"
+                >
+                  <option value="/">📊 Painel Geral / Dashboard (Padrão)</option>
+                  <option value="/tarefas">⚡ Tarefas & Lista de Compras Rápidas</option>
+                  <option value="/compras">🛒 Gestão de Compras & Cotações (RFQ)</option>
+                  <option value="/estoque">📦 Controle de Estoque & Saldos Físicos</option>
+                  <option value="/vendas">🎯 Vendas & Pedidos de Venda</option>
+                  <option value="/producao">🏭 PCP & Ordens de Produção</option>
+                  <option value="/cadastros">👥 Central de Cadastros Gerais</option>
+                </select>
+              </div>
+            </div>
+          )}
+
 
           {/* 1. VISUALIZAÇÃO MOBILE (CARDS INDIVIDUAIS COM TODOS OS BOTÕES ACESSÍVEIS NO CELULAR) */}
           <div className="grid grid-cols-1 gap-3 sm:hidden">
@@ -975,7 +1031,35 @@ export const Configuracoes: React.FC = () => {
             </div>
           )}
 
+          {/* Preferência de Página Inicial ao Entrar */}
+
+          <div className="p-3 rounded-xl border border-brand-200 dark:border-brand-900/40 bg-brand-50/40 dark:bg-brand-950/20 space-y-1.5">
+            <label className="block font-bold text-slate-800 dark:text-brand-200 flex items-center gap-1.5">
+              <span>📍 Página Inicial ao Entrar no Sistema</span>
+            </label>
+            <p className="text-[11px] text-slate-500">
+              Escolha em qual módulo este usuário começará automaticamente ao fazer login no computador ou celular:
+            </p>
+            <select
+              value={editingUser?.preferences?.initialRoute || '/'}
+              onChange={e => setEditingUser(prev => ({
+                ...prev,
+                preferences: { ...(prev?.preferences || {}), initialRoute: e.target.value }
+              }))}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs outline-none focus:border-brand-500 font-bold text-slate-800 dark:text-slate-100"
+            >
+              <option value="/">📊 Painel Geral / Dashboard (Padrão)</option>
+              <option value="/tarefas">⚡ Tarefas & Lista de Compras Rápidas</option>
+              <option value="/compras">🛒 Gestão de Compras & Cotações (RFQ)</option>
+              <option value="/estoque">📦 Controle de Estoque & Saldos Físicos</option>
+              <option value="/vendas">🎯 Vendas & Pedidos de Venda</option>
+              <option value="/producao">🏭 PCP & Ordens de Produção</option>
+              <option value="/cadastros">👥 Central de Cadastros Gerais</option>
+            </select>
+          </div>
+
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+
             <Button
               variant="ghost"
               size="sm"

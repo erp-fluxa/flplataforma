@@ -4,7 +4,10 @@ export interface UserPreferences {
   sidebarCollapsed?: boolean;
   theme?: 'dark' | 'light';
   notificationsSound?: boolean;
+  initialRoute?: string; // Ex: '/', '/tarefas', '/compras', '/estoque', '/vendas', '/producao'
 }
+
+
 
 export interface UserRole {
   id: string;
@@ -276,18 +279,33 @@ export interface QuotationSupplierPrice {
   selecionado?: boolean;
 }
 
+export interface PurchaseOrderItem {
+
+  id: string;
+  productId: string;
+  descricao?: string;
+  quantidade: number;
+  unidade?: string;
+  precoUnitarioCents: number;
+  valorTotalCents: number;
+}
+
 export interface PurchaseOrder {
   id: string;
   codigo: string;
   supplierId: string;
   quotationId?: string;
+  productId?: string;
+  items?: PurchaseOrderItem[];
   status: 'rascunho' | 'emitido' | 'confirmado_fornecedor' | 'recebido_parcial' | 'recebido' | 'cancelado';
   valorTotalCents: number;
   condicaoPagamento?: string;
   previsaoEntrega: string;
+  dataEntregaReal?: string;
   companyId?: string;
   criadoEm: string;
 }
+
 
 export interface SalesOrderItem {
   id: string;

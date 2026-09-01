@@ -297,6 +297,7 @@ export const INITIAL_DATABASE: DatabaseState = {
     }
   ],
   auditLogs: [
+
     {
       id: 'log-init',
       timestamp: new Date().toISOString(),
